@@ -51,6 +51,7 @@ import {
   integrateEnergy,
   normalizeGridAndEps,
   calculatePowerSourceDurations,
+  calculateTimeToFullCharge,
   formatDurationHuman
 } from './utils/energyMath';
 
@@ -561,6 +562,11 @@ export default function App() {
     return calculatePowerSourceDurations(tableRows, gridEpsInfo.isGridOnline, soc);
   }, [tableRows, gridEpsInfo.isGridOnline, soc]);
 
+  // Estimated time until full charge (based on current charging power and 2-stage BMS curve)
+  const timeToFullChargeSec = useMemo(() => {
+    return calculateTimeToFullCharge(soc, battCharge);
+  }, [soc, battCharge]);
+
   // Real-time ticking seconds for current streak timer
   const [currentUptimeSec, setCurrentUptimeSec] = useState(0);
 
@@ -942,6 +948,7 @@ export default function App() {
                 soc={soc}
                 battCharge={battCharge}
                 battDischarge={battDischarge}
+                timeToFullChargeSec={timeToFullChargeSec}
                 dailyChg={dailyChg}
                 dailyDisChg={dailyDisChg}
                 gridImport={gridImport}
@@ -1004,7 +1011,7 @@ export default function App() {
                     <Clock className={`w-4 h-4 ${gridEpsInfo.isGridOnline ? 'text-emerald-500' : 'text-amber-500'}`} />
                   </div>
                 </div>
-                <div className="flex items-baseline justify-between gap-2 my-3">
+                <div className="flex items-center justify-between gap-2 my-3">
                   <span className={`font-mono text-3xl font-extrabold tracking-tight font-tabular ${
                     gridEpsInfo.isGridOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'
                   }`}>
@@ -1056,15 +1063,27 @@ export default function App() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-baseline gap-2 my-3">
-                  <span className={`font-mono text-3xl font-extrabold tracking-tight font-tabular ${
-                    battCharge > 0 ? 'text-emerald-500' : (battDischarge > 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white')
-                  }`}>
-                    {soc}%
-                  </span>
-                  <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                    {battCharge > 0 ? `(${t.chargeWord} ${battCharge} ${unitW})` : (battDischarge > 0 ? `(${t.dischargeWord} ${battDischarge} ${unitW})` : `(${t.standby})`)}
-                  </span>
+                <div className="flex items-center justify-between gap-2 my-3">
+                  <div className="flex items-baseline gap-2">
+                    <span className={`font-mono text-3xl font-extrabold tracking-tight font-tabular ${
+                      battCharge > 0 ? 'text-emerald-500' : (battDischarge > 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white')
+                    }`}>
+                      {soc}%
+                    </span>
+                    <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                      {battCharge > 0 ? `(${t.chargeWord} ${battCharge} ${unitW})` : (battDischarge > 0 ? `(${t.dischargeWord} ${battDischarge} ${unitW})` : `(${t.standby})`)}
+                    </span>
+                  </div>
+                  {battCharge > 0 && timeToFullChargeSec !== null && (
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-mono uppercase text-slate-400">
+                        {t.estTimeToFull}
+                      </span>
+                      <span className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                        ~{formatDurationHuman(timeToFullChargeSec, lang === 'en', false)}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3">
                   <span className="text-emerald-600 dark:text-emerald-400 font-semibold">+{dailyChg} {unitKwh}</span>

@@ -343,6 +343,54 @@ export function calculatePowerSourceDurations(tableRows, isCurrentGridOnline, cu
 }
 
 /**
+ * Calculates estimated time until battery is fully charged (100% SOC) in seconds.
+ * 
+ * Accounts for 2-stage charging curve observed in Luxpower BMS:
+ * - Stage 1 (SOC < 85%): Constant Current / Bulk charge (~1500W or current charge power)
+ * - Stage 2 (SOC >= 85%): Absorption charge where BMS limits current (~1000W or ~66% of bulk power)
+ * 
+ * @param {number} currentSoc Current state of charge (0-100)
+ * @param {number} currentChargePower Watts being delivered to battery (positive)
+ * @param {number} totalCapacityWh Total battery capacity in Watt-hours (default 5120 Wh for 51.2V 100Ah)
+ * @returns {number|null} Estimated seconds until full, or null if not charging / full
+ */
+export function calculateTimeToFullCharge(currentSoc, currentChargePower, totalCapacityWh = 5120) {
+  const soc = parseFloat(String(currentSoc).replace('%', '')) || 0;
+  const pChg = parseFloat(currentChargePower) || 0;
+
+  if (soc >= 100 || pChg < 50) {
+    return null;
+  }
+
+  // Energy needed from current SOC to 85%
+  const targetBulkSoc = 85;
+  let secondsStage1 = 0;
+  let secondsStage2 = 0;
+
+  if (soc < targetBulkSoc) {
+    const deltaSoc1 = targetBulkSoc - soc;
+    const whStage1 = (deltaSoc1 / 100) * totalCapacityWh;
+    // In bulk stage, use current measured charge power (or minimum 1000W if ramp-up)
+    const effectivePowerStage1 = Math.max(1000, pChg);
+    secondsStage1 = (whStage1 / effectivePowerStage1) * 3600;
+
+    // From 85% to 100% (15% SOC), power drops to ~1000W (or 2/3 of bulk power)
+    const whStage2 = (15 / 100) * totalCapacityWh;
+    const effectivePowerStage2 = Math.min(1000, Math.max(500, effectivePowerStage1 * 0.66));
+    secondsStage2 = (whStage2 / effectivePowerStage2) * 3600;
+  } else {
+    // Already in absorption stage (>= 85%)
+    const deltaSoc2 = Math.max(0, 100 - soc);
+    const whStage2 = (deltaSoc2 / 100) * totalCapacityWh;
+    const effectivePowerStage2 = Math.max(300, pChg);
+    secondsStage2 = (whStage2 / effectivePowerStage2) * 3600;
+  }
+
+  const totalSec = Math.round(secondsStage1 + secondsStage2);
+  return totalSec > 0 ? totalSec : null;
+}
+
+/**
  * Formats duration in seconds to "Xh Ym Zs" or "Xh Ym"
  */
 export function formatDurationHuman(seconds, isEn = false, includeSeconds = true) {

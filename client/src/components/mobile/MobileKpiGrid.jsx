@@ -23,6 +23,7 @@ export default function MobileKpiGrid({
   soc = '0',
   battCharge = 0,
   battDischarge = 0,
+  timeToFullChargeSec = null,
   dailyChg = '0',
   dailyDisChg = '0',
   gridImport = 0,
@@ -65,7 +66,7 @@ export default function MobileKpiGrid({
           </div>
         </div>
         <div className="my-1.5">
-          <div className="flex items-baseline justify-between gap-1">
+          <div className="flex items-center justify-between gap-1">
             <span className={`font-mono text-xl font-bold tracking-tight font-tabular ${
               isGridOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'
             }`}>
@@ -118,17 +119,24 @@ export default function MobileKpiGrid({
           </div>
         </div>
         <div className="my-1.5">
-          <div className="flex items-baseline gap-1">
-            <span className={`font-mono text-2xl font-bold font-tabular ${
-              isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-700 dark:text-slate-200'
-            }`}>
-              {soc}%
-            </span>
-            <span className={`font-mono text-[10px] font-semibold truncate ${
-              isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-400'
-            }`}>
-              {battCharge > 0 ? `+${battCharge} ${unitW}` : (battDischarge > 0 ? `-${battDischarge} ${unitW}` : `0 ${unitW}`)}
-            </span>
+          <div className="flex items-center justify-between gap-1">
+            <div className="flex items-baseline gap-1">
+              <span className={`font-mono text-2xl font-bold font-tabular ${
+                isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-700 dark:text-slate-200'
+              }`}>
+                {soc}%
+              </span>
+              <span className={`font-mono text-[10px] font-semibold truncate ${
+                isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-400'
+              }`}>
+                {battCharge > 0 ? `+${battCharge} ${unitW}` : (battDischarge > 0 ? `-${battDischarge} ${unitW}` : `0 ${unitW}`)}
+              </span>
+            </div>
+            {isCharging && timeToFullChargeSec !== null && (
+              <span className="font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400 truncate">
+                ~{formatDurationHuman(timeToFullChargeSec, isEn, false)}
+              </span>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-0.5 pt-1.5 border-t border-slate-100 dark:border-white/[0.05]">
