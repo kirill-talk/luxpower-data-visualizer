@@ -1320,6 +1320,10 @@ export default function App() {
                             totalBatteryDischargeKwh: rangeEnergyStats?.batteryDischargeKwh || 0,
                             totalBatteryChargeKwh: rangeEnergyStats?.batteryChargeKwh || 0,
                             totalInverterLossKwh: rangeEnergyStats?.inverterLossKwh || 0,
+                            totalCostNightUah: rangeEnergyStats?.costNightUah || 0,
+                            totalCostDayUah: rangeEnergyStats?.costDayUah || 0,
+                            totalCostUah: rangeEnergyStats?.costTotalUah || 0,
+                            totalInverterCostUah: rangeEnergyStats?.inverterCostTotalUah || 0,
                             dailyList: [
                               {
                                 date: selectedDate,
@@ -1328,6 +1332,10 @@ export default function App() {
                                 batteryDischargeKwh: rangeEnergyStats?.batteryDischargeKwh || 0,
                                 batteryChargeKwh: rangeEnergyStats?.batteryChargeKwh || 0,
                                 inverterLossKwh: rangeEnergyStats?.inverterLossKwh || 0,
+                                costNightUah: rangeEnergyStats?.costNightUah || 0,
+                                costDayUah: rangeEnergyStats?.costDayUah || 0,
+                                costTotalUah: rangeEnergyStats?.costTotalUah || 0,
+                                inverterCostTotalUah: rangeEnergyStats?.inverterCostTotalUah || 0,
                               },
                             ],
                           }
