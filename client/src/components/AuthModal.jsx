@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Lock, User, Key, Server, CheckCircle2, AlertCircle, LogOut } from 'lucide-react';
+import { X, Lock, User, Key, Server, CheckCircle2, AlertCircle, LogOut, Globe } from 'lucide-react';
 import { translations } from '../utils/i18n';
-import { API_BASE_URL } from '../utils/config';
+import { getApiBaseUrl, setCustomApiUrl } from '../utils/config';
 
 /**
  * AuthModal
@@ -20,6 +20,14 @@ export default function AuthModal({
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [server, setServer] = useState('https://eu.luxpowertek.com');
+  const [apiUrl, setApiUrl] = useState(() => {
+    try {
+      return localStorage.getItem('luxpower-custom-api-url') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -36,7 +44,11 @@ export default function AuthModal({
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      // Save custom API Proxy URL if specified
+      setCustomApiUrl(apiUrl);
+      const endpointBase = getApiBaseUrl();
+
+      const res = await fetch(`${endpointBase}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -54,6 +66,7 @@ export default function AuthModal({
         account: data.account,
         cookie: data.cookie,
         defaultSerial: data.defaultSerial,
+        apiUrl: apiUrl.trim(),
         remember
       });
       onClose();
@@ -188,6 +201,38 @@ export default function AuthModal({
                   <option value="https://us.luxpowertek.com">us.luxpowertek.com (US)</option>
                 </select>
               </div>
+            </div>
+
+            {/* Toggle Advanced Proxy URL */}
+            <div className="flex flex-col gap-1.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 hover:underline self-start flex items-center gap-1"
+              >
+                <span>{showAdvanced ? '▼' : '▶'}</span>
+                <span>{lang === 'en' ? 'API Proxy / Worker URL (Optional)' : 'URL проксі / Cloudflare Worker (Опціонально)'}</span>
+              </button>
+
+              {showAdvanced && (
+                <div className="p-3 rounded-xl bg-slate-100/70 dark:bg-[#0c121e]/80 border border-slate-200 dark:border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                    {lang === 'en'
+                      ? 'Point to your Cloudflare Worker URL (e.g. https://luxpower-proxy.xxx.workers.dev). Leave empty for default.'
+                      : 'Вкажіть URL вашого Cloudflare Worker (наприклад https://luxpower-proxy.xxx.workers.dev). Залиште порожнім за замовчуванням.'}
+                  </span>
+                  <div className="relative mt-1">
+                    <Globe className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="url"
+                      value={apiUrl}
+                      onChange={(e) => setApiUrl(e.target.value)}
+                      placeholder="https://luxpower-proxy.example.workers.dev"
+                      className="w-full bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-white/[0.08] rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Remember Me */}

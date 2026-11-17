@@ -1,0 +1,6 @@
+name = "luxpower-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+LUX_BASE_URL = "https://eu.luxpowertek.com"
