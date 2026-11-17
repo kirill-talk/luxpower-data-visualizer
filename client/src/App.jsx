@@ -45,7 +45,7 @@ import AuthModal from './components/AuthModal';
 import PeriodOverview from './components/PeriodOverview';
 import { getCachedDayChart, setCachedDayChart, runWithConcurrency, isPastDate, cleanupLegacyLocalStorage } from './utils/telemetryCache';
 import { translations } from './utils/i18n';
-import { API_BASE_URL } from './utils/config';
+import { API_BASE_URL, apiFetch } from './utils/config';
 import {
   parseInverterPoint,
   integrateEnergy,
@@ -229,7 +229,7 @@ export default function App() {
   const fetchStatus = async (authOverride = undefined) => {
     try {
       const auth = authOverride !== undefined ? authOverride : customAuth;
-      const res = await fetch(`${API_BASE_URL}/status`, {
+      const res = await apiFetch('/status', {
         headers: getAuthHeaders(auth)
       });
       const data = await res.json();
@@ -247,7 +247,7 @@ export default function App() {
     try {
       const auth = authOverride !== undefined ? authOverride : customAuth;
       const serialParam = auth?.defaultSerial ? `?serial=${encodeURIComponent(auth.defaultSerial)}` : '';
-      const res = await fetch(`${API_BASE_URL}/telemetry/live${serialParam}`, {
+      const res = await apiFetch(`/telemetry/live${serialParam}`, {
         headers: getAuthHeaders(auth)
       });
       const data = await res.json();
@@ -264,8 +264,8 @@ export default function App() {
       const auth = authOverride !== undefined ? authOverride : customAuth;
       const serialQuery = auth?.defaultSerial ? `&serial=${encodeURIComponent(auth.defaultSerial)}` : '';
       const [chartRes, tableRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/telemetry/day-chart?date=${date}${serialQuery}`, { headers: getAuthHeaders(auth) }),
-        fetch(`${API_BASE_URL}/telemetry/table?date=${date}&rows=500${serialQuery}`, { headers: getAuthHeaders(auth) }),
+        apiFetch(`/telemetry/day-chart?date=${date}${serialQuery}`, { headers: getAuthHeaders(auth) }),
+        apiFetch(`/telemetry/table?date=${date}&rows=500${serialQuery}`, { headers: getAuthHeaders(auth) }),
       ]);
       const chartJson = await chartRes.json();
       const tableJson = await tableRes.json();
@@ -329,7 +329,7 @@ export default function App() {
         while (attempts < 2) {
           attempts++;
           try {
-            const res = await fetch(`${API_BASE_URL}/telemetry/day-chart?date=${d}${serialQuery}`, {
+            const res = await apiFetch(`/telemetry/day-chart?date=${d}${serialQuery}`, {
               headers: getAuthHeaders(auth),
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);

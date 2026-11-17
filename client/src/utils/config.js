@@ -20,3 +20,25 @@ export function setCustomApiUrl(url) {
 }
 
 export const API_BASE_URL = getApiBaseUrl();
+
+/**
+ * Fetch wrapper with automatic fallback:
+ * If primary API endpoint fails with network error (e.g. workers.dev DNS/adblock issue),
+ * seamlessly falls back to the self-hosted dev API.
+ */
+export async function apiFetch(path, options = {}) {
+  const primaryBase = getApiBaseUrl();
+  const fallbackBase = 'https://data-visualizer.kidev.uk/api';
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+
+  try {
+    const res = await fetch(`${primaryBase}${cleanPath}`, options);
+    return res;
+  } catch (primaryErr) {
+    if (primaryBase !== fallbackBase) {
+      console.warn(`[apiFetch] Primary (${primaryBase}) failed, retrying with fallback (${fallbackBase}):`, primaryErr);
+      return await fetch(`${fallbackBase}${cleanPath}`, options);
+    }
+    throw primaryErr;
+  }
+}

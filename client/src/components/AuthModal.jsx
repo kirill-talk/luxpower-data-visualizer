@@ -48,15 +48,35 @@ export default function AuthModal({
       setCustomApiUrl(apiUrl);
       const endpointBase = getApiBaseUrl();
 
-      const res = await fetch(`${endpointBase}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          account: account.trim(),
-          password: password.trim(),
-          server: server.trim()
-        }),
-      });
+      let res;
+      try {
+        res = await fetch(`${endpointBase}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            account: account.trim(),
+            password: password.trim(),
+            server: server.trim()
+          }),
+        });
+      } catch (fetchErr) {
+        // If primary Cloudflare Worker fetch fails (DNS/blocked/CORS), try fallback dev API
+        const fallbackBase = 'https://data-visualizer.kidev.uk/api';
+        if (endpointBase !== fallbackBase) {
+          console.warn(`Primary proxy (${endpointBase}) failed, trying fallback (${fallbackBase}):`, fetchErr);
+          res = await fetch(`${fallbackBase}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              account: account.trim(),
+              password: password.trim(),
+              server: server.trim()
+            }),
+          });
+        } else {
+          throw fetchErr;
+        }
+      }
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || (lang === 'en' ? 'Login failed' : 'Помилка авторизації'));
