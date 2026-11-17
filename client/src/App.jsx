@@ -43,6 +43,7 @@ import MobileRecentLog from './components/mobile/MobileRecentLog';
 import MobilePowerFlowDiagram from './components/mobile/MobilePowerFlowDiagram';
 import AuthModal from './components/AuthModal';
 import PeriodOverview from './components/PeriodOverview';
+import { getCachedDayChart, setCachedDayChart, runWithConcurrency, isPastDate } from './utils/telemetryCache';
 import { translations } from './utils/i18n';
 import { API_BASE_URL } from './utils/config';
 import {
@@ -271,6 +272,10 @@ export default function App() {
       if (chartJson && chartJson.data) {
         setChartData(chartJson.data);
         setRangePoints(chartJson.data.map(parseInverterPoint));
+        // Cache finished past day chart
+        if (auth?.defaultSerial) {
+          setCachedDayChart(auth.defaultSerial, date, chartJson.data);
+        }
       } else {
         setChartData([]);
         setRangePoints([]);
@@ -293,43 +298,76 @@ export default function App() {
     }
   };
 
-  // Multi-day history fetcher for Period Overview
+  // Multi-day history fetcher for Period Overview with Caching and Concurrency Pool
   const fetchPeriodHistory = async (dates, authOverride = undefined) => {
     if (!dates || !dates.length) return;
     setLoading(true);
     try {
       const auth = authOverride !== undefined ? authOverride : customAuth;
-      const serialQuery = auth?.defaultSerial ? `&serial=${encodeURIComponent(auth.defaultSerial)}` : '';
+      const serial = auth?.defaultSerial || '';
+      const serialQuery = serial ? `&serial=${encodeURIComponent(serial)}` : '';
 
-      // Fetch all dates in parallel
-      const results = await Promise.all(
-        dates.map(async (d) => {
-          try {
-            const res = await fetch(`${API_BASE_URL}/telemetry/day-chart?date=${d}${serialQuery}`, {
-              headers: getAuthHeaders(auth),
-            });
-            const json = await res.json();
-            const points = (json && json.data ? json.data : []).map(parseInverterPoint).filter(Boolean);
+      // Prepare tasks: check cache first, fetch only missing or unfinalized (today) dates
+      const tasks = dates.map((d) => async () => {
+        // 1. Try cache if past date
+        if (isPastDate(d)) {
+          const cachedData = getCachedDayChart(serial, d);
+          if (cachedData && Array.isArray(cachedData) && cachedData.length > 0) {
+            const points = cachedData.map(parseInverterPoint).filter(Boolean);
             const stats = integrateEnergy(points);
             return {
               date: d,
               points,
               ...stats,
             };
-          } catch (e) {
-            console.error(`Error fetching day chart for ${d}:`, e);
+          }
+        }
+
+        // 2. Fetch from network with retry
+        let attempts = 0;
+        while (attempts < 2) {
+          attempts++;
+          try {
+            const res = await fetch(`${API_BASE_URL}/telemetry/day-chart?date=${d}${serialQuery}`, {
+              headers: getAuthHeaders(auth),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            const rawData = json && json.data ? json.data : [];
+            const points = rawData.map(parseInverterPoint).filter(Boolean);
+            const stats = integrateEnergy(points);
+
+            // Cache if past date
+            if (isPastDate(d) && rawData.length > 0) {
+              setCachedDayChart(serial, d, rawData);
+            }
+
             return {
               date: d,
-              points: [],
-              gridImportKwh: 0,
-              consumptionKwh: 0,
-              batteryChargeKwh: 0,
-              batteryDischargeKwh: 0,
-              inverterLossKwh: 0,
+              points,
+              ...stats,
             };
+          } catch (e) {
+            if (attempts >= 2) {
+              console.error(`Error fetching day chart for ${d} after retry:`, e);
+              return {
+                date: d,
+                points: [],
+                gridImportKwh: 0,
+                consumptionKwh: 0,
+                batteryChargeKwh: 0,
+                batteryDischargeKwh: 0,
+                inverterLossKwh: 0,
+              };
+            }
+            // Wait 250ms before retry
+            await new Promise((r) => setTimeout(r, 250));
           }
-        })
-      );
+        }
+      });
+
+      // Run network requests with concurrency pool (max 2 parallel requests, 60ms stagger)
+      const results = await runWithConcurrency(tasks, 2, 60);
 
       // Sum all metrics
       let totalConsumptionKwh = 0;
@@ -358,11 +396,6 @@ export default function App() {
         dailyList: results,
       });
 
-      // Also update selected day's detailed view to the latest date in the period
-      const lastDate = dates[dates.length - 1];
-      if (lastDate !== selectedDate) {
-        setSelectedDate(lastDate);
-      }
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       console.error('Period history fetch error:', err);
@@ -391,40 +424,6 @@ export default function App() {
     }
   }, [selectedDate, periodMode, customRange?.start, customRange?.end]);
 
-  // 6-minute (360s) Auto-refresh timer with 1s countdown tick
-  useEffect(() => {
-    if (!autoRefresh) {
-      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
-      return;
-    }
-
-    countdownTimerRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          fetchLive();
-          if (periodMode === '1d') {
-            fetchHistory(selectedDate);
-          } else if (periodMode === 'custom') {
-            if (customRange?.start && customRange?.end) {
-              const dates = getDateRangeArray(customRange.start, customRange.end);
-              fetchPeriodHistory(dates);
-            }
-          } else {
-            const { start, end } = calculatePeriodDates(periodMode, selectedDate);
-            const dates = getDateRangeArray(start, end);
-            fetchPeriodHistory(dates);
-          }
-          return 360;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
-    };
-  }, [autoRefresh, selectedDate, periodMode, customRange]);
-
   const handleManualRefresh = () => {
     setCountdown(360);
     fetchLive();
@@ -441,6 +440,33 @@ export default function App() {
       fetchPeriodHistory(dates);
     }
   };
+
+  // Keep latest ref so timer interval doesn't need to re-bind or recreate
+  const refreshFnRef = useRef(handleManualRefresh);
+  refreshFnRef.current = handleManualRefresh;
+
+  // 6-minute (360s) Auto-refresh timer with 1s countdown tick
+  // Refreshes only when counter reaches 0 seconds; never resets or re-fires on tab switching
+  useEffect(() => {
+    if (!autoRefresh) {
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      return;
+    }
+
+    countdownTimerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          if (refreshFnRef.current) refreshFnRef.current();
+          return 360;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    };
+  }, [autoRefresh]);
 
   // Day navigation handlers
   const handlePrevDay = () => {
