@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as echarts from 'echarts';
 import { translations } from '../utils/i18n';
+import { parseInverterPoint } from '../utils/energyMath';
 
 function formatTimeWithoutSeconds(timeStr) {
   if (!timeStr) return '';
@@ -64,15 +65,19 @@ export default function PowerFlowChart({ rawData, onZoomChange, lang = 'uk' }) {
       chartInstanceRef.current.on('datazoom', (params) => {
         if (!onZoomChangeRef.current || !sortedDataRef.current.length) return;
         const opt = chartInstanceRef.current.getOption();
-        if (!opt || !opt.dataZoom) return;
-
+        
         let startPct = 0;
         let endPct = 100;
 
-        if (Array.isArray(opt.dataZoom)) {
+        // Try getting from event params first (params.batch[0] or params)
+        const paramDz = params?.batch ? params.batch[0] : params;
+        if (paramDz && typeof paramDz.start === 'number' && typeof paramDz.end === 'number' && !isNaN(paramDz.start) && !isNaN(paramDz.end)) {
+          startPct = paramDz.start;
+          endPct = paramDz.end;
+        } else if (opt && opt.dataZoom && Array.isArray(opt.dataZoom)) {
           const dz = opt.dataZoom[0];
-          startPct = dz.start !== undefined ? dz.start : 0;
-          endPct = dz.end !== undefined ? dz.end : 100;
+          startPct = typeof dz.start === 'number' && !isNaN(dz.start) ? dz.start : 0;
+          endPct = typeof dz.end === 'number' && !isNaN(dz.end) ? dz.end : 100;
         }
 
         const totalLen = sortedDataRef.current.length;
@@ -80,7 +85,9 @@ export default function PowerFlowChart({ rawData, onZoomChange, lang = 'uk' }) {
         const endIndex = Math.min(totalLen - 1, Math.ceil((endPct / 100) * totalLen));
 
         const sliced = sortedDataRef.current.slice(startIndex, endIndex + 1);
-        onZoomChangeRef.current(sliced);
+        // Map raw data points to parsed inverter points expected by integrateEnergy
+        const parsedSliced = sliced.map(parseInverterPoint).filter(Boolean);
+        onZoomChangeRef.current(parsedSliced);
       });
     }
 

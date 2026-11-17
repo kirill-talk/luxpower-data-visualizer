@@ -83,6 +83,40 @@ export function integrateEnergy(points) {
     };
   }
 
+  // Normalize points if raw telemetry points were passed directly
+  const normPoints = points.map((p) => {
+    if (!p) return null;
+    if (
+      p.gridImport !== undefined &&
+      p.consumption !== undefined &&
+      p.batteryDischarge !== undefined &&
+      p.batteryCharge !== undefined
+    ) {
+      return p;
+    }
+    return parseInverterPoint(p);
+  }).filter(Boolean);
+
+  if (normPoints.length < 2) {
+    return {
+      gridImportKwh: 0,
+      consumptionKwh: 0,
+      batteryChargeKwh: 0,
+      batteryDischargeKwh: 0,
+      inverterLossKwh: 0,
+      solarPvKwh: 0,
+      durationHours: 0,
+      gridNightKwh: 0,
+      gridDayKwh: 0,
+      costNightUah: 0,
+      costDayUah: 0,
+      costTotalUah: 0,
+      inverterLossNightKwh: 0,
+      inverterLossDayKwh: 0,
+      inverterCostTotalUah: 0,
+    };
+  }
+
   let gridImportKwh = 0;
   let consumptionKwh = 0;
   let batteryChargeKwh = 0;
@@ -97,9 +131,9 @@ export function integrateEnergy(points) {
 
   let totalSeconds = 0;
 
-  for (let i = 0; i < points.length - 1; i++) {
-    const p1 = points[i];
-    const p2 = points[i + 1];
+  for (let i = 0; i < normPoints.length - 1; i++) {
+    const p1 = normPoints[i];
+    const p2 = normPoints[i + 1];
 
     const d1 = new Date(p1.time.replace(/-/g, '/'));
     const d2 = new Date(p2.time.replace(/-/g, '/'));

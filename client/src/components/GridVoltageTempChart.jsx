@@ -58,18 +58,21 @@ export default function GridVoltageTempChart({ tableRows, onZoomChange, lang = '
     if (!chartInstanceRef.current) {
       chartInstanceRef.current = echarts.init(chartRef.current);
 
-      chartInstanceRef.current.on('datazoom', () => {
+      chartInstanceRef.current.on('datazoom', (params) => {
         if (!onZoomChangeRef.current || !sortedDataRef.current.length) return;
         const opt = chartInstanceRef.current.getOption();
-        if (!opt || !opt.dataZoom) return;
 
         let startPct = 0;
         let endPct = 100;
 
-        if (Array.isArray(opt.dataZoom)) {
+        const paramDz = params?.batch ? params.batch[0] : params;
+        if (paramDz && typeof paramDz.start === 'number' && typeof paramDz.end === 'number' && !isNaN(paramDz.start) && !isNaN(paramDz.end)) {
+          startPct = paramDz.start;
+          endPct = paramDz.end;
+        } else if (opt && opt.dataZoom && Array.isArray(opt.dataZoom)) {
           const dz = opt.dataZoom[0];
-          startPct = dz.start !== undefined ? dz.start : 0;
-          endPct = dz.end !== undefined ? dz.end : 100;
+          startPct = typeof dz.start === 'number' && !isNaN(dz.start) ? dz.start : 0;
+          endPct = typeof dz.end === 'number' && !isNaN(dz.end) ? dz.end : 100;
         }
 
         const totalLen = sortedDataRef.current.length;
