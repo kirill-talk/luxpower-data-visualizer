@@ -43,7 +43,7 @@ import MobileRecentLog from './components/mobile/MobileRecentLog';
 import MobilePowerFlowDiagram from './components/mobile/MobilePowerFlowDiagram';
 import AuthModal from './components/AuthModal';
 import PeriodOverview from './components/PeriodOverview';
-import { getCachedDayChart, setCachedDayChart, runWithConcurrency, isPastDate } from './utils/telemetryCache';
+import { getCachedDayChart, setCachedDayChart, runWithConcurrency, isPastDate, cleanupLegacyLocalStorage } from './utils/telemetryCache';
 import { translations } from './utils/i18n';
 import { API_BASE_URL } from './utils/config';
 import {
@@ -311,7 +311,7 @@ export default function App() {
       const tasks = dates.map((d) => async () => {
         // 1. Try cache if past date
         if (isPastDate(d)) {
-          const cachedData = getCachedDayChart(serial, d);
+          const cachedData = await getCachedDayChart(serial, d);
           if (cachedData && Array.isArray(cachedData) && cachedData.length > 0) {
             const points = cachedData.map(parseInverterPoint).filter(Boolean);
             const stats = integrateEnergy(points);
@@ -405,6 +405,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    cleanupLegacyLocalStorage();
     fetchStatus();
     fetchLive();
   }, []);

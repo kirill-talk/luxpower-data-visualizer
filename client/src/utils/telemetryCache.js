@@ -1,18 +1,53 @@
 /**
- * Client-side Telemetry Cache and Concurrency Pool
+ * Client-side Telemetry Cache using native IndexedDB
  *
- * 1. Cache:
- *    - Completed past days are immutable: cached indefinitely in localStorage with LRU eviction.
- *    - Today is mutable: not cached as finalized, or cached with short TTL.
+ * 1. Storage:
+ *    - IndexedDB database 'luxpower_db', store 'day_charts'.
+ *    - Key: `${serial}_${dateStr}`
+ *    - Value: { key, serial, date: dateStr, data: rawPoints, savedAt: timestamp }
+ *    - Unlimited capacity compared to localStorage (no 5MB limit).
+ *    - Fully asynchronous: does not block the UI thread during parsing.
  *
  * 2. Concurrency Pool:
- *    - Runs at most `concurrency` (e.g. 2-3) requests simultaneously with an optional delay
- *      between requests to avoid triggering Luxpower cloud rate-limiters.
+ *    - Runs at most `concurrency` (e.g. 2-3) requests simultaneously with delay.
  *    - Automatic retry with backoff on failed requests.
  */
 
-const CACHE_PREFIX = 'lux_chart_';
-const CACHE_MAX_ITEMS = 60; // Up to 60 days of historical points
+const DB_NAME = 'luxpower_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'day_charts';
+
+let dbInstancePromise = null;
+
+function getDB() {
+  if (dbInstancePromise) return dbInstancePromise;
+
+  dbInstancePromise = new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      return reject(new Error('IndexedDB not supported'));
+    }
+
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'key' });
+      }
+    };
+
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+
+    request.onerror = () => {
+      console.warn('IndexedDB open error:', request.error);
+      reject(request.error);
+    };
+  });
+
+  return dbInstancePromise;
+}
 
 /**
  * Check if date string (YYYY-MM-DD) is in the past compared to local today.
@@ -25,70 +60,75 @@ export function isPastDate(dateStr) {
 }
 
 /**
- * Get cached day chart data if available.
+ * Get cached day chart data from IndexedDB.
  */
-export function getCachedDayChart(serial, dateStr) {
+export async function getCachedDayChart(serial, dateStr) {
   try {
-    const key = `${CACHE_PREFIX}${serial || 'default'}_${dateStr}`;
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.data || null;
+    const db = await getDB();
+    const key = `${serial || 'default'}_${dateStr}`;
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(key);
+
+      req.onsuccess = () => {
+        resolve(req.result ? req.result.data : null);
+      };
+
+      req.onerror = () => {
+        resolve(null);
+      };
+    });
   } catch (e) {
-    console.warn('Failed reading telemetry cache:', e);
+    console.warn('Failed reading from IndexedDB cache:', e);
     return null;
   }
 }
 
 /**
- * Set cached day chart data for past dates.
+ * Save day chart data for past dates into IndexedDB.
  */
-export function setCachedDayChart(serial, dateStr, data) {
-  // Only cache valid non-empty past data to prevent caching today's incomplete data
+export async function setCachedDayChart(serial, dateStr, data) {
   if (!isPastDate(dateStr) || !data || !Array.isArray(data) || data.length === 0) {
     return;
   }
 
   try {
-    const key = `${CACHE_PREFIX}${serial || 'default'}_${dateStr}`;
-    localStorage.setItem(key, JSON.stringify({
-      savedAt: Date.now(),
-      data,
-    }));
-    pruneOldCache();
-  } catch (e) {
-    // If quota exceeded, prune and retry once
-    try {
-      pruneOldCache(true);
-      const key = `${CACHE_PREFIX}${serial || 'default'}_${dateStr}`;
-      localStorage.setItem(key, JSON.stringify({
-        savedAt: Date.now(),
+    const db = await getDB();
+    const key = `${serial || 'default'}_${dateStr}`;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.put({
+        key,
+        serial: serial || 'default',
+        date: dateStr,
         data,
-      }));
-    } catch {}
+        savedAt: Date.now(),
+      });
+
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.warn('Failed writing to IndexedDB cache:', e);
   }
 }
 
 /**
- * Evict oldest entries if cache exceeds CACHE_MAX_ITEMS.
+ * Clean up legacy localStorage chart keys if they were written earlier.
  */
-function pruneOldCache(aggressive = false) {
+export function cleanupLegacyLocalStorage() {
   try {
-    const keys = [];
+    if (typeof localStorage === 'undefined') return;
+    const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.startsWith(CACHE_PREFIX)) {
-        keys.push(k);
+      if (k && k.startsWith('lux_chart_')) {
+        keysToRemove.push(k);
       }
     }
-
-    const limit = aggressive ? Math.floor(CACHE_MAX_ITEMS / 2) : CACHE_MAX_ITEMS;
-    if (keys.length > limit) {
-      // Sort oldest by key or savedAt
-      keys.sort();
-      const toRemove = keys.slice(0, keys.length - limit);
-      toRemove.forEach((k) => localStorage.removeItem(k));
-    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
   } catch {}
 }
 
