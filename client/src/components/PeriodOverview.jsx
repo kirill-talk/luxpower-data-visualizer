@@ -9,7 +9,8 @@ import {
   TrendingUp,
   Percent,
   Layers,
-  BarChart3
+  BarChart3,
+  Coins
 } from 'lucide-react';
 import { translations } from '../utils/i18n';
 
@@ -32,6 +33,10 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
     totalBatteryDischargeKwh = 0,
     totalBatteryChargeKwh = 0,
     totalInverterLossKwh = 0,
+    totalCostNightUah = 0,
+    totalCostDayUah = 0,
+    totalCostUah = 0,
+    totalInverterCostUah = 0,
     daysCount = 0,
     dailyList = [],
   } = periodStats || {};
@@ -286,7 +291,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
           </div>
         </div>
 
-        {/* KPI 4: Inverter Consumption (Losses) */}
+        {/* KPI 4: Inverter Consumption */}
         <div className="bg-white dark:bg-[#111827]/90 rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -303,8 +308,8 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{unitKwh}</span>
           </div>
           <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3 text-slate-500 dark:text-slate-400">
-            <span>{t.avgDailyLoss}:</span>
-            <strong className="text-purple-600 dark:text-purple-300 font-semibold">{avgDailyLoss} {unitKwh}</strong>
+            <span>{isEn ? 'Cost' : 'Вартість'}:</span>
+            <strong className="text-purple-600 dark:text-purple-300 font-semibold">≈{totalInverterCostUah} ₴</strong>
           </div>
         </div>
 
@@ -333,31 +338,81 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
         </div>
       </div>
 
-      {/* Autonomy Progress Bar Strip */}
-      <div className="bg-white dark:bg-[#111827]/90 rounded-2xl p-4 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col gap-2.5">
-        <div className="flex items-center justify-between text-xs font-mono">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-            <span className="text-slate-700 dark:text-slate-300 font-medium">
-              {t.batteryShare}: <strong className="font-bold text-emerald-600 dark:text-emerald-400">{batterySharePct}%</strong> ({totalBatteryDischargeKwh} {unitKwh})
-            </span>
+      {/* Autonomy Progress Bar Strip & Cost Breakdown Strip */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Autonomy Progress Bar Strip */}
+        <div className="bg-white dark:bg-[#111827]/90 rounded-2xl p-4 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between gap-2.5">
+          <div className="flex items-center justify-between text-xs font-mono">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span className="text-slate-700 dark:text-slate-300 font-medium">
+                {t.batteryShare}: <strong className="font-bold text-emerald-600 dark:text-emerald-400">{batterySharePct}%</strong> ({totalBatteryDischargeKwh} {unitKwh})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+              <span className="text-slate-700 dark:text-slate-300 font-medium">
+                {t.gridShare}: <strong className="font-bold text-rose-500">{gridSharePct}%</strong> ({totalGridImportKwh} {unitKwh})
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
-            <span className="text-slate-700 dark:text-slate-300 font-medium">
-              {t.gridShare}: <strong className="font-bold text-rose-500">{gridSharePct}%</strong> ({totalGridImportKwh} {unitKwh})
-            </span>
+          <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+              style={{ width: `${batterySharePct}%` }}
+            />
+            <div
+              className="h-full bg-gradient-to-r from-rose-500 to-amber-500 transition-all duration-500"
+              style={{ width: `${gridSharePct}%` }}
+            />
           </div>
         </div>
-        <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
-          <div
-            className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
-            style={{ width: `${batterySharePct}%` }}
-          />
-          <div
-            className="h-full bg-gradient-to-r from-rose-500 to-amber-500 transition-all duration-500"
-            style={{ width: `${gridSharePct}%` }}
-          />
+
+        {/* Financial Cost Card: Dual-Tariff Energy & Inverter Cost */}
+        <div className="bg-white dark:bg-[#111827]/90 rounded-2xl p-4 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between gap-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+                <Coins className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {isEn ? 'Electricity Cost (2-zone)' : 'Вартість електроенергії (2 зони)'}
+              </span>
+            </div>
+            <div className="font-mono text-xs text-slate-500 dark:text-slate-400">
+              {isEn ? 'Total' : 'Разом'}: <span className="font-bold text-slate-900 dark:text-white text-sm">{totalCostUah} ₴</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 pt-1 font-mono text-xs border-t border-slate-100 dark:border-white/[0.06]">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-400 uppercase font-sans">
+                {isEn ? 'Night (23-07)' : 'Ніч (23-07)'}
+              </span>
+              <span className="font-bold text-indigo-500 dark:text-indigo-400">
+                {totalCostNightUah} ₴
+              </span>
+              <span className="text-[10px] text-slate-400">@ 2.16 ₴</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-400 uppercase font-sans">
+                {isEn ? 'Day (07-23)' : 'День (07-23)'}
+              </span>
+              <span className="font-bold text-amber-500 dark:text-amber-400">
+                {totalCostDayUah} ₴
+              </span>
+              <span className="text-[10px] text-slate-400">@ 4.32 ₴</span>
+            </div>
+            <div className="flex flex-col border-l border-slate-100 dark:border-white/[0.06] pl-2">
+              <span className="text-[10px] text-purple-400 uppercase font-sans">
+                {isEn ? 'Inverter Self-Cons.' : 'Інвертор (власне)'}
+              </span>
+              <span className="font-bold text-purple-500 dark:text-purple-400">
+                {totalInverterCostUah} ₴
+              </span>
+              <span className="text-[10px] text-slate-400">({totalInverterLossKwh} {unitKwh})</span>
+            </div>
+          </div>
         </div>
       </div>
 

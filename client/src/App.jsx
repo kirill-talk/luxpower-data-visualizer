@@ -375,6 +375,10 @@ export default function App() {
       let totalBatteryDischargeKwh = 0;
       let totalBatteryChargeKwh = 0;
       let totalInverterLossKwh = 0;
+      let totalCostNightUah = 0;
+      let totalCostDayUah = 0;
+      let totalCostUah = 0;
+      let totalInverterCostUah = 0;
 
       results.forEach((r) => {
         totalConsumptionKwh += r.consumptionKwh || 0;
@@ -382,6 +386,10 @@ export default function App() {
         totalBatteryDischargeKwh += r.batteryDischargeKwh || 0;
         totalBatteryChargeKwh += r.batteryChargeKwh || 0;
         totalInverterLossKwh += r.inverterLossKwh || 0;
+        totalCostNightUah += r.costNightUah || 0;
+        totalCostDayUah += r.costDayUah || 0;
+        totalCostUah += r.costTotalUah || 0;
+        totalInverterCostUah += r.inverterCostTotalUah || 0;
       });
 
       setPeriodStats({
@@ -393,6 +401,10 @@ export default function App() {
         totalBatteryDischargeKwh: parseFloat(totalBatteryDischargeKwh.toFixed(2)),
         totalBatteryChargeKwh: parseFloat(totalBatteryChargeKwh.toFixed(2)),
         totalInverterLossKwh: parseFloat(totalInverterLossKwh.toFixed(2)),
+        totalCostNightUah: parseFloat(totalCostNightUah.toFixed(2)),
+        totalCostDayUah: parseFloat(totalCostDayUah.toFixed(2)),
+        totalCostUah: parseFloat(totalCostUah.toFixed(2)),
+        totalInverterCostUah: parseFloat(totalInverterCostUah.toFixed(2)),
         dailyList: results,
       });
 

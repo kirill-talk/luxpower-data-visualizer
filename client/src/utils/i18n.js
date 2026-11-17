@@ -69,7 +69,7 @@ export const translations = {
     gridImportKwh: 'Grid Import',
     homeLoadKwh: 'Home Load',
     batteryKwh: 'Battery',
-    inverterLossKwh: 'Inverter Loss',
+    inverterLossKwh: 'Inverter Consumption',
 
     // Chart Series
     seriesImport: 'Import',
@@ -94,7 +94,7 @@ export const translations = {
     avgConsumptionShort: 'Avg',
     kpiBattery: 'Battery',
     kpiGridImport: 'Grid Import',
-    kpiInverterLoss: 'Inverter (Loss)',
+    kpiInverterLoss: 'Inverter Consumption',
     gridPowered: 'Grid Powered',
     epsPowered: 'Battery (EPS)',
     gridOffline: 'Grid Offline',
@@ -245,7 +245,7 @@ export const translations = {
     gridImportKwh: 'Імпорт з мережі',
     homeLoadKwh: 'Спожито домом',
     batteryKwh: 'Батарея',
-    inverterLossKwh: 'Втрати інвертора',
+    inverterLossKwh: 'Споживання інвертора',
 
     // Chart Series
     seriesImport: 'Імпорт',
@@ -270,7 +270,7 @@ export const translations = {
     avgConsumptionShort: 'Сер.',
     kpiBattery: 'Акумулятор',
     kpiGridImport: 'Імпорт з мережі',
-    kpiInverterLoss: 'Інвертор (Втрати)',
+    kpiInverterLoss: 'Споживання інвертора',
     gridPowered: 'Живлення від мережі',
     epsPowered: 'Живлення від АКБ',
     gridOffline: 'Мережа відключена',

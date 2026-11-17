@@ -42,7 +42,22 @@ export function parseInverterPoint(point) {
 }
 
 /**
- * Numerically integrate a power series (in Watts) across timestamps to get energy in kWh.
+ * Dual-tariff pricing constants (Ukraine UAH):
+ * - Night rate (23:00 - 06:59): 2.16 UAH/kWh
+ * - Day rate (07:00 - 22:59): 4.32 UAH/kWh
+ */
+export const TARIFF_NIGHT_UAH = 2.16;
+export const TARIFF_DAY_UAH = 4.32;
+
+export function isNightTariff(dateObj) {
+  const h = dateObj.getHours();
+  // 23:00 - 06:59 (hours 23, 0, 1, 2, 3, 4, 5, 6)
+  return h >= 23 || h < 7;
+}
+
+/**
+ * Numerically integrate a power series (in Watts) across timestamps to get energy in kWh,
+ * and cost in UAH split by day and night tariffs.
  * Uses trapezoidal rule based on time deltas in hours.
  */
 export function integrateEnergy(points) {
@@ -55,6 +70,16 @@ export function integrateEnergy(points) {
       inverterLossKwh: 0,
       solarPvKwh: 0,
       durationHours: 0,
+      // Tariff breakdown for Grid Import
+      gridNightKwh: 0,
+      gridDayKwh: 0,
+      costNightUah: 0,
+      costDayUah: 0,
+      costTotalUah: 0,
+      // Cost of Inverter Consumption
+      inverterLossNightKwh: 0,
+      inverterLossDayKwh: 0,
+      inverterCostTotalUah: 0,
     };
   }
 
@@ -65,14 +90,21 @@ export function integrateEnergy(points) {
   let inverterLossKwh = 0;
   let solarPvKwh = 0;
 
+  let gridNightKwh = 0;
+  let gridDayKwh = 0;
+  let inverterLossNightKwh = 0;
+  let inverterLossDayKwh = 0;
+
   let totalSeconds = 0;
 
   for (let i = 0; i < points.length - 1; i++) {
     const p1 = points[i];
     const p2 = points[i + 1];
 
-    const t1 = new Date(p1.time.replace(/-/g, '/')).getTime();
-    const t2 = new Date(p2.time.replace(/-/g, '/')).getTime();
+    const d1 = new Date(p1.time.replace(/-/g, '/'));
+    const d2 = new Date(p2.time.replace(/-/g, '/'));
+    const t1 = d1.getTime();
+    const t2 = d2.getTime();
     const dtSeconds = Math.max(0, (t2 - t1) / 1000);
 
     // If gap between points is more than 30 mins (e.g. data outage), cap or treat as 6 mins
@@ -80,13 +112,37 @@ export function integrateEnergy(points) {
     const dtHours = validDeltaSec / 3600;
     totalSeconds += validDeltaSec;
 
-    gridImportKwh += ((p1.gridImport + p2.gridImport) / 2) * dtHours / 1000;
-    consumptionKwh += ((p1.consumption + p2.consumption) / 2) * dtHours / 1000;
-    batteryChargeKwh += ((p1.batteryCharge + p2.batteryCharge) / 2) * dtHours / 1000;
-    batteryDischargeKwh += ((p1.batteryDischarge + p2.batteryDischarge) / 2) * dtHours / 1000;
-    inverterLossKwh += ((p1.inverterLoss + p2.inverterLoss) / 2) * dtHours / 1000;
-    solarPvKwh += ((p1.solarPv + p2.solarPv) / 2) * dtHours / 1000;
+    const segGrid = (((p1.gridImport + p2.gridImport) / 2) * dtHours) / 1000;
+    const segCons = (((p1.consumption + p2.consumption) / 2) * dtHours) / 1000;
+    const segChg = (((p1.batteryCharge + p2.batteryCharge) / 2) * dtHours) / 1000;
+    const segDis = (((p1.batteryDischarge + p2.batteryDischarge) / 2) * dtHours) / 1000;
+    const segLoss = (((p1.inverterLoss + p2.inverterLoss) / 2) * dtHours) / 1000;
+    const segSolar = (((p1.solarPv + p2.solarPv) / 2) * dtHours) / 1000;
+
+    gridImportKwh += segGrid;
+    consumptionKwh += segCons;
+    batteryChargeKwh += segChg;
+    batteryDischargeKwh += segDis;
+    inverterLossKwh += segLoss;
+    solarPvKwh += segSolar;
+
+    // Tariff calculation based on segment midpoint time
+    const midDate = new Date(t1 + (validDeltaSec * 1000) / 2);
+    if (isNightTariff(midDate)) {
+      gridNightKwh += segGrid;
+      inverterLossNightKwh += segLoss;
+    } else {
+      gridDayKwh += segGrid;
+      inverterLossDayKwh += segLoss;
+    }
   }
+
+  const costNightUah = gridNightKwh * TARIFF_NIGHT_UAH;
+  const costDayUah = gridDayKwh * TARIFF_DAY_UAH;
+  const costTotalUah = costNightUah + costDayUah;
+
+  const inverterCostTotalUah =
+    inverterLossNightKwh * TARIFF_NIGHT_UAH + inverterLossDayKwh * TARIFF_DAY_UAH;
 
   return {
     gridImportKwh: parseFloat(gridImportKwh.toFixed(2)),
@@ -96,6 +152,16 @@ export function integrateEnergy(points) {
     inverterLossKwh: parseFloat(inverterLossKwh.toFixed(2)),
     solarPvKwh: parseFloat(solarPvKwh.toFixed(2)),
     durationHours: parseFloat((totalSeconds / 3600).toFixed(1)),
+    // Tariff stats
+    gridNightKwh: parseFloat(gridNightKwh.toFixed(2)),
+    gridDayKwh: parseFloat(gridDayKwh.toFixed(2)),
+    costNightUah: parseFloat(costNightUah.toFixed(2)),
+    costDayUah: parseFloat(costDayUah.toFixed(2)),
+    costTotalUah: parseFloat(costTotalUah.toFixed(2)),
+    // Inverter consumption cost
+    inverterLossNightKwh: parseFloat(inverterLossNightKwh.toFixed(2)),
+    inverterLossDayKwh: parseFloat(inverterLossDayKwh.toFixed(2)),
+    inverterCostTotalUah: parseFloat(inverterCostTotalUah.toFixed(2)),
   };
 }
 
@@ -240,21 +306,27 @@ export function calculatePowerSourceDurations(tableRows, isCurrentGridOnline, cu
       ? parseFloat(String(currentSoc).replace('%', ''))
       : parseFloat(String(streakRows[0].soc || '0').replace('%', ''));
 
+    // BMS Cutoff threshold: battery shuts down at 15% SOC
+    const BMS_CUTOFF_SOC = 15;
+    const usableSoc = Math.max(0, latestSocNum - BMS_CUTOFF_SOC);
+
     // Check SOC at start of outage
     const oldestStreakRow = streakRows[streakRows.length - 1];
     const startSocNum = parseFloat(String(oldestStreakRow.soc || '100').replace('%', ''));
     const socDelta = startSocNum - latestSocNum;
     const elapsedHours = currentStreakSec / 3600;
 
-    if (elapsedHours > 0.2 && socDelta > 1) {
+    if (usableSoc <= 0) {
+      estimatedRemainingSec = 0;
+    } else if (elapsedHours > 0.2 && socDelta > 1) {
       // Approach A: Observed burn rate (% SOC consumed per hour)
       const burnRatePerHour = socDelta / elapsedHours;
-      const hoursRemaining = Math.max(0, latestSocNum / burnRatePerHour);
+      const hoursRemaining = burnRatePerHour > 0 ? usableSoc / burnRatePerHour : 0;
       estimatedRemainingSec = Math.round(hoursRemaining * 3600);
     } else if (avgConsumptionDuringOutage > 0) {
       // Approach B: Capacity energy model (nominal 100Ah/200Ah ~ 5.12kWh-10kWh, default ~5000Wh)
-      // Wh remaining = (latestSocNum / 100) * 5120Wh
-      const remainingWh = (Math.max(0, latestSocNum) / 100) * 5120;
+      // Wh remaining = (usableSoc / 100) * 5120Wh
+      const remainingWh = (usableSoc / 100) * 5120;
       const hoursRemaining = remainingWh / avgConsumptionDuringOutage;
       estimatedRemainingSec = Math.round(hoursRemaining * 3600);
     }
