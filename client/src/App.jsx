@@ -42,6 +42,7 @@ import MobileStatusBar from './components/mobile/MobileStatusBar';
 import MobileRecentLog from './components/mobile/MobileRecentLog';
 import MobilePowerFlowDiagram from './components/mobile/MobilePowerFlowDiagram';
 import AuthModal from './components/AuthModal';
+import PeriodOverview from './components/PeriodOverview';
 import { translations } from './utils/i18n';
 import { API_BASE_URL } from './utils/config';
 import {
@@ -71,12 +72,56 @@ function getTodayLocalDate() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// Generate an array of YYYY-MM-DD date strings between start and end (inclusive, chronological)
+function getDateRangeArray(startDateStr, endDateStr) {
+  const dates = [];
+  const curr = new Date(startDateStr);
+  const end = new Date(endDateStr);
+  const pad = (n) => String(n).padStart(2, '0');
+
+  while (curr <= end) {
+    dates.push(`${curr.getFullYear()}-${pad(curr.getMonth() + 1)}-${pad(curr.getDate())}`);
+    curr.setDate(curr.getDate() + 1);
+  }
+  return dates;
+}
+
+// Helper to compute start date given period mode and anchor date
+function calculatePeriodDates(mode, anchorDateStr) {
+  const [y, m, d] = anchorDateStr.split('-').map(Number);
+  const anchor = new Date(y, m - 1, d);
+  const pad = (n) => String(n).padStart(2, '0');
+  const toStr = (dateObj) => `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}`;
+
+  if (mode === '7d') {
+    const start = new Date(anchor);
+    start.setDate(start.getDate() - 6);
+    return { start: toStr(start), end: anchorDateStr };
+  } else if (mode === 'month') {
+    const start = new Date(y, m - 1, 1);
+    return { start: toStr(start), end: anchorDateStr };
+  }
+  return { start: anchorDateStr, end: anchorDateStr };
+}
+
 export default function App() {
   const [status, setStatus] = useState(null);
   const [liveData, setLiveData] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [tableRows, setTableRows] = useState([]);
   const [selectedDate, setSelectedDate] = useState(getTodayLocalDate);
+  const [periodMode, setPeriodMode] = useState('1d'); // '1d' | '3d' | '7d' | '14d' | '30d' | 'month' | 'custom'
+  const [customRange, setCustomRange] = useState(() => {
+    const today = getTodayLocalDate();
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    const pad = (n) => String(n).padStart(2, '0');
+    return {
+      start: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      end: today,
+    };
+  });
+  const [periodStats, setPeriodStats] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [countdown, setCountdown] = useState(360);
   const [loading, setLoading] = useState(false);
@@ -112,32 +157,8 @@ export default function App() {
   // Mobile sidebar open state
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Active anchor link tracking
-  const [activeSection, setActiveSection] = useState('power-flow');
-
-  // Scrollspy: update active section in sidebar on scroll
-  useEffect(() => {
-    const handleScroll = () => {
-      const sectionIds = ['power-flow', 'power-balance', 'battery-bms', 'grid-temp', 'telemetry-logs'];
-      const scrollPosition = window.scrollY + 200;
-
-      for (let i = sectionIds.length - 1; i >= 0; i--) {
-        const id = sectionIds[i];
-        const el = document.getElementById(id);
-        if (el) {
-          const top = el.offsetTop;
-          if (scrollPosition >= top) {
-            setActiveSection(id);
-            break;
-          }
-        }
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  // Active tab state: 'dashboard' | 'consumption' | 'battery-bms' | 'grid-temp' | 'telemetry-logs'
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   // Selected range data for PowerFlow chart
   const [rangePoints, setRangePoints] = useState(null);
@@ -272,14 +293,103 @@ export default function App() {
     }
   };
 
+  // Multi-day history fetcher for Period Overview
+  const fetchPeriodHistory = async (dates, authOverride = undefined) => {
+    if (!dates || !dates.length) return;
+    setLoading(true);
+    try {
+      const auth = authOverride !== undefined ? authOverride : customAuth;
+      const serialQuery = auth?.defaultSerial ? `&serial=${encodeURIComponent(auth.defaultSerial)}` : '';
+
+      // Fetch all dates in parallel
+      const results = await Promise.all(
+        dates.map(async (d) => {
+          try {
+            const res = await fetch(`${API_BASE_URL}/telemetry/day-chart?date=${d}${serialQuery}`, {
+              headers: getAuthHeaders(auth),
+            });
+            const json = await res.json();
+            const points = (json && json.data ? json.data : []).map(parseInverterPoint).filter(Boolean);
+            const stats = integrateEnergy(points);
+            return {
+              date: d,
+              points,
+              ...stats,
+            };
+          } catch (e) {
+            console.error(`Error fetching day chart for ${d}:`, e);
+            return {
+              date: d,
+              points: [],
+              gridImportKwh: 0,
+              consumptionKwh: 0,
+              batteryChargeKwh: 0,
+              batteryDischargeKwh: 0,
+              inverterLossKwh: 0,
+            };
+          }
+        })
+      );
+
+      // Sum all metrics
+      let totalConsumptionKwh = 0;
+      let totalGridImportKwh = 0;
+      let totalBatteryDischargeKwh = 0;
+      let totalBatteryChargeKwh = 0;
+      let totalInverterLossKwh = 0;
+
+      results.forEach((r) => {
+        totalConsumptionKwh += r.consumptionKwh || 0;
+        totalGridImportKwh += r.gridImportKwh || 0;
+        totalBatteryDischargeKwh += r.batteryDischargeKwh || 0;
+        totalBatteryChargeKwh += r.batteryChargeKwh || 0;
+        totalInverterLossKwh += r.inverterLossKwh || 0;
+      });
+
+      setPeriodStats({
+        startDate: dates[0],
+        endDate: dates[dates.length - 1],
+        daysCount: dates.length,
+        totalConsumptionKwh: parseFloat(totalConsumptionKwh.toFixed(2)),
+        totalGridImportKwh: parseFloat(totalGridImportKwh.toFixed(2)),
+        totalBatteryDischargeKwh: parseFloat(totalBatteryDischargeKwh.toFixed(2)),
+        totalBatteryChargeKwh: parseFloat(totalBatteryChargeKwh.toFixed(2)),
+        totalInverterLossKwh: parseFloat(totalInverterLossKwh.toFixed(2)),
+        dailyList: results,
+      });
+
+      // Also update selected day's detailed view to the latest date in the period
+      const lastDate = dates[dates.length - 1];
+      if (lastDate !== selectedDate) {
+        setSelectedDate(lastDate);
+      }
+      setLastUpdated(new Date().toLocaleTimeString());
+    } catch (err) {
+      console.error('Period history fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchStatus();
     fetchLive();
   }, []);
 
   useEffect(() => {
-    fetchHistory(selectedDate);
-  }, [selectedDate]);
+    if (periodMode === '1d') {
+      fetchHistory(selectedDate);
+    } else if (periodMode === 'custom') {
+      if (customRange?.start && customRange?.end) {
+        const dates = getDateRangeArray(customRange.start, customRange.end);
+        fetchPeriodHistory(dates);
+      }
+    } else {
+      const { start, end } = calculatePeriodDates(periodMode, selectedDate);
+      const dates = getDateRangeArray(start, end);
+      fetchPeriodHistory(dates);
+    }
+  }, [selectedDate, periodMode, customRange?.start, customRange?.end]);
 
   // 6-minute (360s) Auto-refresh timer with 1s countdown tick
   useEffect(() => {
@@ -292,7 +402,18 @@ export default function App() {
       setCountdown((prev) => {
         if (prev <= 1) {
           fetchLive();
-          fetchHistory(selectedDate);
+          if (periodMode === '1d') {
+            fetchHistory(selectedDate);
+          } else if (periodMode === 'custom') {
+            if (customRange?.start && customRange?.end) {
+              const dates = getDateRangeArray(customRange.start, customRange.end);
+              fetchPeriodHistory(dates);
+            }
+          } else {
+            const { start, end } = calculatePeriodDates(periodMode, selectedDate);
+            const dates = getDateRangeArray(start, end);
+            fetchPeriodHistory(dates);
+          }
           return 360;
         }
         return prev - 1;
@@ -302,12 +423,23 @@ export default function App() {
     return () => {
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     };
-  }, [autoRefresh, selectedDate]);
+  }, [autoRefresh, selectedDate, periodMode, customRange]);
 
   const handleManualRefresh = () => {
     setCountdown(360);
     fetchLive();
-    fetchHistory(selectedDate);
+    if (periodMode === '1d') {
+      fetchHistory(selectedDate);
+    } else if (periodMode === 'custom') {
+      if (customRange?.start && customRange?.end) {
+        const dates = getDateRangeArray(customRange.start, customRange.end);
+        fetchPeriodHistory(dates);
+      }
+    } else {
+      const { start, end } = calculatePeriodDates(periodMode, selectedDate);
+      const dates = getDateRangeArray(start, end);
+      fetchPeriodHistory(dates);
+    }
   };
 
   // Day navigation handlers
@@ -466,11 +598,11 @@ export default function App() {
   }, [gridRangeRows]);
 
   const navLinks = [
-    { id: 'power-flow', label: t.navPowerFlow, icon: Share2 },
-    { id: 'power-balance', label: t.navPowerBalance || t.secPowerFlowTitle, icon: Activity },
-    { id: 'battery-bms', label: t.navBatteryBms, icon: BatteryCharging },
-    { id: 'grid-temp', label: t.navGridTemp, icon: Radio },
-    { id: 'telemetry-logs', label: t.navTelemetryLogs, icon: Table2 },
+    { id: 'dashboard', label: t.navDashboard || 'Dashboard', icon: Share2 },
+    { id: 'consumption', label: t.navConsumption || 'Споживання', icon: Activity },
+    { id: 'battery-bms', label: t.navBatteryBms || 'Батарея та BMS', icon: BatteryCharging },
+    { id: 'grid-temp', label: t.navGridTemp || 'Мережа та Температура', icon: Radio },
+    { id: 'telemetry-logs', label: t.navTelemetryLogs || 'Журнал телеметрії', icon: Table2 },
   ];
 
   return (
@@ -522,16 +654,16 @@ export default function App() {
             <nav className="flex flex-col gap-1">
               {navLinks.map((item) => {
                 const IconComponent = item.icon;
-                const isActive = activeSection === item.id;
+                const isActive = activeTab === item.id;
                 return (
-                  <a
+                  <button
                     key={item.id}
-                    href={`#${item.id}`}
                     onClick={() => {
-                      setActiveSection(item.id);
+                      setActiveTab(item.id);
                       setSidebarOpen(false);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-all ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-all text-left ${
                       isActive
                         ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 font-semibold border-l-2 border-emerald-500 shadow-sm'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.04]'
@@ -539,7 +671,7 @@ export default function App() {
                   >
                     <IconComponent className="w-4 h-4 shrink-0" />
                     <span className="text-[13px] tracking-tight">{item.label}</span>
-                  </a>
+                  </button>
                 );
               })}
             </nav>
@@ -641,7 +773,7 @@ export default function App() {
 
           {/* Controls: Date, Refresh, Auto, Language, Theme Toggle */}
           <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
-            {/* Date Navigator */}
+            {/* Date Navigator: Only single-day calendar picker in header */}
             <div className="inline-flex items-center rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] p-0.5 shadow-sm">
               <button
                 onClick={handlePrevDay}
@@ -807,8 +939,8 @@ export default function App() {
                 totalRows={tableRows.length}
                 lang={lang}
                 onShowAll={() => {
-                  const el = document.getElementById('telemetry-logs');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  setActiveTab('telemetry-logs');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
               />
             </div>
@@ -959,288 +1091,413 @@ export default function App() {
               </div>
             </section>
 
-            {/* SECTION: POWER FLOW DIAGRAM (DESKTOP: 1200px+) */}
-            <div id="power-flow" className="hidden xl:block scroll-mt-24">
-              <PowerFlowDiagram
-                solarPower={0}
-                gridPower={gridImport}
-                homeLoad={homeLoad}
-                batteryPower={battCharge > 0 ? battCharge : (battDischarge > 0 ? -battDischarge : 0)}
-                soc={soc}
-                inverterLoss={currentInverterLoss}
-                gridVoltage={gridEpsInfo.voltage}
-                gridFrequency={gridEpsInfo.frequency}
-                isGridOnline={gridEpsInfo.isGridOnline}
-                isEpsActive={!gridEpsInfo.isGridOnline}
-                inverterTemp={latestRow?.tinner ?? '28.0'}
-                batteryVoltage={latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : '50.1'}
-                batteryCurrent={latestRow?.bmsBatCurrent ? Math.abs(Number(latestRow.bmsBatCurrent)).toFixed(1) : (battCharge > 0 ? (battCharge / 50).toFixed(1) : '0.0')}
-                loadPercent={latestRow?.loadPercent ?? '4.6'}
-                lang={lang}
-              />
-            </div>
-
-            {/* SECTION 1: POWER BALANCE */}
-            <section
-              id="power-balance"
-              className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col gap-5 transition-all scroll-mt-24"
-            >
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-white/[0.06]">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-600 dark:text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
-                    <Activity className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                  </div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                    {t.secPowerFlowTitle}
-                  </h2>
+            {/* TAB 1: DASHBOARD (Потоки енергії & Баланс потужності) */}
+            {activeTab === 'dashboard' && (
+              <div className="flex flex-col gap-6">
+                {/* Power Flow Diagram (Desktop) */}
+                <div id="power-flow" className="hidden xl:block">
+                  <PowerFlowDiagram
+                    solarPower={0}
+                    gridPower={gridImport}
+                    homeLoad={homeLoad}
+                    batteryPower={battCharge > 0 ? battCharge : (battDischarge > 0 ? -battDischarge : 0)}
+                    soc={soc}
+                    inverterLoss={currentInverterLoss}
+                    gridVoltage={gridEpsInfo.voltage}
+                    gridFrequency={gridEpsInfo.frequency}
+                    isGridOnline={gridEpsInfo.isGridOnline}
+                    isEpsActive={!gridEpsInfo.isGridOnline}
+                    inverterTemp={latestRow?.tinner ?? '28.0'}
+                    batteryVoltage={latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : '50.1'}
+                    batteryCurrent={latestRow?.bmsBatCurrent ? Math.abs(Number(latestRow.bmsBatCurrent)).toFixed(1) : (battCharge > 0 ? (battCharge / 50).toFixed(1) : '0.0')}
+                    loadPercent={latestRow?.loadPercent ?? '4.6'}
+                    lang={lang}
+                  />
                 </div>
-                <span className="text-xs font-mono text-slate-400 dark:text-slate-400 flex items-center gap-1.5">
-                  <Info className="w-3.5 h-3.5" />
-                  {t.secPowerFlowSub}
-                </span>
+
+                {/* Power Balance 24h Chart */}
+                <section
+                  id="power-balance"
+                  className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col gap-5 transition-all"
+                >
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-white/[0.06]">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-600 dark:text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
+                        <Activity className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                      </div>
+                      <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                        {t.secPowerFlowTitle}
+                      </h2>
+                    </div>
+                    <span className="text-xs font-mono text-slate-400 dark:text-slate-400 flex items-center gap-1.5">
+                      <Info className="w-3.5 h-3.5" />
+                      {t.secPowerFlowSub}
+                    </span>
+                  </div>
+
+                  {/* Summary Metrics Strip */}
+                  {rangeEnergyStats && (
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-slate-50 dark:bg-[#0c121e]/80 rounded-xl p-4 border border-slate-100 dark:border-white/[0.05]">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          {t.period}: {rangeStartTime || '00:00'} - {rangeEndTime || '24:00'}
+                        </span>
+                        <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 mt-1">
+                          ({rangeEnergyStats.durationHours} {t.hours})
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                          {t.gridImportKwh}
+                        </span>
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                          <span className="font-mono text-xl font-bold text-rose-600 dark:text-rose-400 font-tabular">
+                            {rangeEnergyStats.gridImportKwh}
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">{unitKwh}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                          <Home className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          {t.homeLoadKwh}
+                        </span>
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                          <span className="font-mono text-xl font-bold text-amber-500 dark:text-amber-400 font-tabular">
+                            {rangeEnergyStats.consumptionKwh}
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">{unitKwh}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                          <Battery className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          {t.batteryKwh}
+                        </span>
+                        <div className="flex items-baseline gap-1.5 mt-0.5 font-mono font-semibold">
+                          <span className="text-emerald-600 dark:text-emerald-400 text-lg font-tabular">
+                            +{rangeEnergyStats.batteryChargeKwh}
+                          </span>
+                          <span className="text-rose-500 dark:text-rose-400 text-lg font-tabular">
+                            -{rangeEnergyStats.batteryDischargeKwh}
+                          </span>
+                          <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">{unitKwh}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                          <Cpu className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                          {t.inverterLossKwh}
+                        </span>
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                          <span className="font-mono text-xl font-bold text-purple-500 dark:text-purple-400 font-tabular">
+                            {rangeEnergyStats.inverterLossKwh}
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">{unitKwh}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <PowerFlowChart rawData={chartData} onZoomChange={setRangePoints} lang={lang} />
+                </section>
               </div>
+            )}
 
-              {/* Summary Metrics Strip */}
-              {rangeEnergyStats && (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-slate-50 dark:bg-[#0c121e]/80 rounded-xl p-4 border border-slate-100 dark:border-white/[0.05]">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      {t.period}: {rangeStartTime || '00:00'} - {rangeEndTime || '24:00'}
-                    </span>
-                    <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 mt-1">
-                      ({rangeEnergyStats.durationHours} {t.hours})
-                    </span>
+            {/* TAB 2: CONSUMPTION / СПОЖИВАННЯ (Статистика за період: 1д, 1н, 1м, range) */}
+            {activeTab === 'consumption' && (
+              <div className="flex flex-col gap-6">
+                {/* Period Mode Selector Toolbar in Consumption Tab */}
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#111827]/90 rounded-2xl p-4 border border-slate-200/90 dark:border-white/[0.08] shadow-sm">
+                  <div className="flex items-center gap-1.5 overflow-x-auto p-0.5 rounded-xl bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08]">
+                    {[
+                      { key: '1d', label: '1д' },
+                      { key: '7d', label: '1н' },
+                      { key: 'month', label: '1м' },
+                      { key: 'custom', label: t.periodCustom || 'Період' },
+                    ].map((p) => (
+                      <button
+                        key={p.key}
+                        onClick={() => setPeriodMode(p.key)}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
+                          periodMode === p.key
+                            ? 'bg-emerald-500 text-white shadow-sm font-semibold'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-                      <Zap className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                      {t.gridImportKwh}
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-mono text-xl font-bold text-rose-600 dark:text-rose-400 font-tabular">
-                        {rangeEnergyStats.gridImportKwh}
-                      </span>
-                      <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">{unitKwh}</span>
+
+                  {/* Range inputs: only shown if custom range is selected */}
+                  {periodMode === 'custom' && (
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-xs font-mono">
+                      <Calendar className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span className="text-slate-500 dark:text-slate-400 text-[11px]">{t.rangeFrom}:</span>
+                      <input
+                        type="date"
+                        value={customRange?.start || ''}
+                        onChange={(e) => setCustomRange((prev) => ({ ...prev, start: e.target.value }))}
+                        className="bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer text-xs w-[96px] [color-scheme:light] dark:[color-scheme:dark]"
+                      />
+                      <span className="text-slate-400">-</span>
+                      <span className="text-slate-500 dark:text-slate-400 text-[11px]">{t.rangeTo}:</span>
+                      <input
+                        type="date"
+                        value={customRange?.end || ''}
+                        onChange={(e) => setCustomRange((prev) => ({ ...prev, end: e.target.value }))}
+                        className="bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer text-xs w-[96px] [color-scheme:light] dark:[color-scheme:dark]"
+                      />
                     </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-                      <Home className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                      {t.homeLoadKwh}
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-mono text-xl font-bold text-amber-500 dark:text-amber-400 font-tabular">
-                        {rangeEnergyStats.consumptionKwh}
-                      </span>
-                      <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">{unitKwh}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-                      <Battery className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      {t.batteryKwh}
-                    </span>
-                    <div className="flex items-baseline gap-1.5 mt-0.5 font-mono font-semibold">
-                      <span className="text-emerald-600 dark:text-emerald-400 text-lg font-tabular">
-                        +{rangeEnergyStats.batteryChargeKwh}
-                      </span>
-                      <span className="text-rose-500 dark:text-rose-400 text-lg font-tabular">
-                        -{rangeEnergyStats.batteryDischargeKwh}
-                      </span>
-                      <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">{unitKwh}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-                      <Cpu className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                      {t.inverterLossKwh}
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-mono text-xl font-bold text-purple-500 dark:text-purple-400 font-tabular">
-                        {rangeEnergyStats.inverterLossKwh}
-                      </span>
-                      <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">{unitKwh}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
-              )}
 
-              <PowerFlowChart rawData={chartData} onZoomChange={setRangePoints} lang={lang} />
-            </section>
-
-            {/* SECTION 2: BATTERY & BMS */}
-            <section
-              id="battery-bms"
-              className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col gap-5 transition-all scroll-mt-24"
-            >
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-white/[0.06]">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
-                    <BatteryCharging className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <section id="consumption-stats" className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                        {periodMode === '1d' ? `${t.periodOverview}: ${selectedDate}` : `${t.periodOverview} (${periodStats?.startDate || selectedDate} — ${periodStats?.endDate || selectedDate})`}
+                      </h2>
+                    </div>
+                    {loading && (
+                      <span className="text-xs font-mono text-emerald-500 animate-pulse">
+                        {t.loadingPeriodData}
+                      </span>
+                    )}
                   </div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                    {t.secBatteryTitle}
-                  </h2>
-                </div>
-                <span className="text-xs font-mono text-slate-400 dark:text-slate-400 flex items-center gap-1.5">
-                  <Info className="w-3.5 h-3.5" />
-                  {t.secAveragesSub}
-                </span>
+                  <PeriodOverview
+                    periodStats={
+                      periodMode === '1d'
+                        ? {
+                            startDate: selectedDate,
+                            endDate: selectedDate,
+                            daysCount: 1,
+                            totalConsumptionKwh: rangeEnergyStats?.consumptionKwh || 0,
+                            totalGridImportKwh: rangeEnergyStats?.gridImportKwh || 0,
+                            totalBatteryDischargeKwh: rangeEnergyStats?.batteryDischargeKwh || 0,
+                            totalBatteryChargeKwh: rangeEnergyStats?.batteryChargeKwh || 0,
+                            totalInverterLossKwh: rangeEnergyStats?.inverterLossKwh || 0,
+                            dailyList: [
+                              {
+                                date: selectedDate,
+                                consumptionKwh: rangeEnergyStats?.consumptionKwh || 0,
+                                gridImportKwh: rangeEnergyStats?.gridImportKwh || 0,
+                                batteryDischargeKwh: rangeEnergyStats?.batteryDischargeKwh || 0,
+                                batteryChargeKwh: rangeEnergyStats?.batteryChargeKwh || 0,
+                                inverterLossKwh: rangeEnergyStats?.inverterLossKwh || 0,
+                              },
+                            ],
+                          }
+                        : periodStats
+                    }
+                    lang={lang}
+                  />
+                </section>
+
+                {/* Detailed 24h consumption curve for the selected day */}
+                <section
+                  className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col gap-5"
+                >
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-white/[0.06]">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-500">
+                        <Home className="w-4 h-4" />
+                      </div>
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                        {t.secPowerFlowTitle} ({selectedDate})
+                      </h3>
+                    </div>
+                    <span className="text-xs font-mono text-slate-400">
+                      {rangeStartTime} - {rangeEndTime}
+                    </span>
+                  </div>
+                  <PowerFlowChart rawData={chartData} onZoomChange={setRangePoints} lang={lang} />
+                </section>
               </div>
+            )}
 
-              {/* Summary Metrics Strip */}
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">
-                  {t.secAveragesSub}
-                </span>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 dark:bg-[#0c121e]/80 rounded-xl p-4 border border-slate-100 dark:border-white/[0.05]">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      {t.avgSoc}
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-mono text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-tabular">
-                        {batteryAverages.avgSoc}
-                      </span>
-                      <span className="text-sm font-mono text-slate-500 dark:text-slate-400">%</span>
+            {/* TAB 3: BATTERY & BMS */}
+            {activeTab === 'battery-bms' && (
+              <section
+                id="battery-bms"
+                className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col gap-5 transition-all"
+              >
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-white/[0.06]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
+                      <BatteryCharging className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     </div>
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                      {t.secBatteryTitle}
+                    </h2>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      {t.avgVoltage}
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-mono text-2xl font-bold text-amber-600 dark:text-amber-400 font-tabular">
-                        {batteryAverages.avgVbat}
+                  <span className="text-xs font-mono text-slate-400 dark:text-slate-400 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5" />
+                    {t.secAveragesSub}
+                  </span>
+                </div>
+
+                {/* Summary Metrics Strip */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">
+                    {t.secAveragesSub}
+                  </span>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 dark:bg-[#0c121e]/80 rounded-xl p-4 border border-slate-100 dark:border-white/[0.05]">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        {t.avgSoc}
                       </span>
-                      <span className="text-sm font-mono text-slate-500 dark:text-slate-400">{unitV}</span>
+                      <div className="flex items-baseline gap-1 mt-0.5">
+                        <span className="font-mono text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-tabular">
+                          {batteryAverages.avgSoc}
+                        </span>
+                        <span className="text-sm font-mono text-slate-500 dark:text-slate-400">%</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      {t.avgCurrent}
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-mono text-2xl font-bold text-cyan-600 dark:text-cyan-400 font-tabular">
-                        {batteryAverages.avgCurrent}
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        {t.avgVoltage}
                       </span>
-                      <span className="text-sm font-mono text-slate-500 dark:text-slate-400">{isEn ? 'A' : 'А'}</span>
+                      <div className="flex items-baseline gap-1 mt-0.5">
+                        <span className="font-mono text-2xl font-bold text-amber-600 dark:text-amber-400 font-tabular">
+                          {batteryAverages.avgVbat}
+                        </span>
+                        <span className="text-sm font-mono text-slate-500 dark:text-slate-400">{unitV}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      {t.avgTemp}
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-mono text-2xl font-bold text-rose-600 dark:text-rose-400 font-tabular">
-                        {batteryAverages.avgTbat}
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        {t.avgCurrent}
                       </span>
-                      <span className="text-sm font-mono text-slate-500 dark:text-slate-400">°C</span>
+                      <div className="flex items-baseline gap-1 mt-0.5">
+                        <span className="font-mono text-2xl font-bold text-cyan-600 dark:text-cyan-400 font-tabular">
+                          {batteryAverages.avgCurrent}
+                        </span>
+                        <span className="text-sm font-mono text-slate-500 dark:text-slate-400">{isEn ? 'A' : 'А'}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        {t.avgTemp}
+                      </span>
+                      <div className="flex items-baseline gap-1 mt-0.5">
+                        <span className="font-mono text-2xl font-bold text-rose-600 dark:text-rose-400 font-tabular">
+                          {batteryAverages.avgTbat}
+                        </span>
+                        <span className="text-sm font-mono text-slate-500 dark:text-slate-400">°C</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <BatteryChart tableRows={tableRows} onZoomChange={setBatteryRangeRows} lang={lang} />
-            </section>
+                <BatteryChart tableRows={tableRows} onZoomChange={setBatteryRangeRows} lang={lang} />
+              </section>
+            )}
 
-            {/* SECTION 3: GRID & TEMPERATURE */}
-            <section
-              id="grid-temp"
-              className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col gap-5 transition-all scroll-mt-24"
-            >
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-white/[0.06]">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-600 dark:text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
-                    <Radio className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+            {/* TAB 4: GRID & TEMPERATURE */}
+            {activeTab === 'grid-temp' && (
+              <section
+                id="grid-temp"
+                className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col gap-5 transition-all"
+              >
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-white/[0.06]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-600 dark:text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
+                      <Radio className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                    </div>
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                      {t.secGridTitle}
+                    </h2>
                   </div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                    {t.secGridTitle}
-                  </h2>
+                  <span className="text-xs font-mono text-slate-400 dark:text-slate-400 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5" />
+                    {t.secAveragesSub}
+                  </span>
                 </div>
-                <span className="text-xs font-mono text-slate-400 dark:text-slate-400 flex items-center gap-1.5">
-                  <Info className="w-3.5 h-3.5" />
-                  {t.secAveragesSub}
-                </span>
-              </div>
 
-              {/* Summary Metrics Strip */}
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">
-                  {t.secAveragesSub}
-                </span>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 dark:bg-[#0c121e]/80 rounded-xl p-4 border border-slate-100 dark:border-white/[0.05]">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      {t.avgGridVac}
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-mono text-2xl font-bold text-cyan-600 dark:text-cyan-400 font-tabular">
-                        {gridAverages.avgVac}
+                {/* Summary Metrics Strip */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">
+                    {t.secAveragesSub}
+                  </span>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 dark:bg-[#0c121e]/80 rounded-xl p-4 border border-slate-100 dark:border-white/[0.05]">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        {t.avgGridVac}
                       </span>
-                      <span className="text-sm font-mono text-slate-500 dark:text-slate-400">{unitV}</span>
+                      <div className="flex items-baseline gap-1 mt-0.5">
+                        <span className="font-mono text-2xl font-bold text-cyan-600 dark:text-cyan-400 font-tabular">
+                          {gridAverages.avgVac}
+                        </span>
+                        <span className="text-sm font-mono text-slate-500 dark:text-slate-400">{unitV}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      {t.avgGridFac}
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-mono text-2xl font-bold text-purple-600 dark:text-purple-400 font-tabular">
-                        {gridAverages.avgFac}
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        {t.avgGridFac}
                       </span>
-                      <span className="text-sm font-mono text-slate-500 dark:text-slate-400">{unitHz}</span>
+                      <div className="flex items-baseline gap-1 mt-0.5">
+                        <span className="font-mono text-2xl font-bold text-purple-600 dark:text-purple-400 font-tabular">
+                          {gridAverages.avgFac}
+                        </span>
+                        <span className="text-sm font-mono text-slate-500 dark:text-slate-400">{unitHz}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      {t.avgInverterTemp}
-                    </span>
-                    <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-mono text-2xl font-bold text-amber-600 dark:text-amber-400 font-tabular">
-                        {gridAverages.avgTinner}
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        {t.avgInverterTemp}
                       </span>
-                      <span className="text-sm font-mono text-slate-500 dark:text-slate-400">°C</span>
+                      <div className="flex items-baseline gap-1 mt-0.5">
+                        <span className="font-mono text-2xl font-bold text-amber-600 dark:text-amber-400 font-tabular">
+                          {gridAverages.avgTinner}
+                        </span>
+                        <span className="text-sm font-mono text-slate-500 dark:text-slate-400">°C</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      {t.avgRadiators}
-                    </span>
-                    <div className="flex items-baseline gap-1.5 mt-0.5 font-mono font-bold">
-                      <span className="text-rose-600 dark:text-rose-400 text-xl font-tabular">{gridAverages.avgTrad1}°C</span>
-                      <span className="text-slate-300 dark:text-slate-600">/</span>
-                      <span className="text-rose-600 dark:text-rose-400 text-xl font-tabular">{gridAverages.avgTrad2}°C</span>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        {t.avgRadiators}
+                      </span>
+                      <div className="flex items-baseline gap-1.5 mt-0.5 font-mono font-bold">
+                        <span className="text-rose-600 dark:text-rose-400 text-xl font-tabular">{gridAverages.avgTrad1}°C</span>
+                        <span className="text-slate-300 dark:text-slate-600">/</span>
+                        <span className="text-rose-600 dark:text-rose-400 text-xl font-tabular">{gridAverages.avgTrad2}°C</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <GridVoltageTempChart tableRows={tableRows} onZoomChange={setGridRangeRows} lang={lang} />
-            </section>
+                <GridVoltageTempChart tableRows={tableRows} onZoomChange={setGridRangeRows} lang={lang} />
+              </section>
+            )}
 
-            {/* SECTION 4: TELEMETRY LOGS */}
-            <section
-              id="telemetry-logs"
-              className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col gap-5 transition-all scroll-mt-24"
-            >
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-white/[0.06]">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.2)]">
-                    <Table2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            {/* TAB 5: TELEMETRY LOGS */}
+            {activeTab === 'telemetry-logs' && (
+              <section
+                id="telemetry-logs"
+                className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col gap-5 transition-all"
+              >
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-white/[0.06]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.2)]">
+                      <Table2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                      {t.secLogsTitle} ({tableRows.length} {t.logsCount})
+                    </h2>
                   </div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                    {t.secLogsTitle} ({tableRows.length} {t.logsCount})
-                  </h2>
+                  <span className="text-xs font-mono text-slate-400 dark:text-slate-400">
+                    {t.logsSub}
+                  </span>
                 </div>
-                <span className="text-xs font-mono text-slate-400 dark:text-slate-400">
-                  {t.logsSub}
-                </span>
-              </div>
 
-              <DataTable rows={tableRows} lang={lang} />
-            </section>
+                <DataTable rows={tableRows} lang={lang} />
+              </section>
+            )}
           </div>
         </main>
       </div>

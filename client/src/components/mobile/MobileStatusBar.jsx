@@ -7,7 +7,7 @@ import { translations } from '../../utils/i18n';
  * Compact quick status bar placed at top of mobile screen:
  * - Model & Serial Number
  * - Last update timestamp
- * - Date picker
+ * - Period Selector & Date controls
  * - 6-min Countdown badge & quick refresh button
  */
 export default function MobileStatusBar({
@@ -15,6 +15,10 @@ export default function MobileStatusBar({
   lastUpdated,
   selectedDate,
   onDateChange,
+  periodMode = '1d',
+  onPeriodChange,
+  customRange = { start: '', end: '' },
+  onCustomRangeChange,
   countdown = 360,
   autoRefresh = true,
   onToggleAutoRefresh,
@@ -24,6 +28,7 @@ export default function MobileStatusBar({
   lang = 'uk',
 }) {
   const t = translations[lang] || translations.uk;
+  const isEn = lang === 'en';
 
   const formatCountdown = (sec) => {
     const m = Math.floor(sec / 60);
@@ -32,7 +37,7 @@ export default function MobileStatusBar({
   };
 
   return (
-    <div className="flex flex-col gap-2 p-3 bg-white dark:bg-[#171b26] rounded-xl border border-slate-200/80 dark:border-white/[0.08] shadow-sm transition-colors">
+    <div className="flex flex-col gap-2.5 p-3 bg-white dark:bg-[#171b26] rounded-xl border border-slate-200/80 dark:border-white/[0.08] shadow-sm transition-colors">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <span
