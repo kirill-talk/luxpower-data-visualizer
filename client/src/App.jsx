@@ -43,6 +43,7 @@ import MobileRecentLog from './components/mobile/MobileRecentLog';
 import MobilePowerFlowDiagram from './components/mobile/MobilePowerFlowDiagram';
 import AuthModal from './components/AuthModal';
 import { translations } from './utils/i18n';
+import { API_BASE_URL } from './utils/config';
 import {
   parseInverterPoint,
   integrateEnergy,
@@ -205,7 +206,7 @@ export default function App() {
   const fetchStatus = async (authOverride = undefined) => {
     try {
       const auth = authOverride !== undefined ? authOverride : customAuth;
-      const res = await fetch('/api/status', {
+      const res = await fetch(`${API_BASE_URL}/status`, {
         headers: getAuthHeaders(auth)
       });
       const data = await res.json();
@@ -223,7 +224,7 @@ export default function App() {
     try {
       const auth = authOverride !== undefined ? authOverride : customAuth;
       const serialParam = auth?.defaultSerial ? `?serial=${encodeURIComponent(auth.defaultSerial)}` : '';
-      const res = await fetch(`/api/telemetry/live${serialParam}`, {
+      const res = await fetch(`${API_BASE_URL}/telemetry/live${serialParam}`, {
         headers: getAuthHeaders(auth)
       });
       const data = await res.json();
@@ -240,8 +241,8 @@ export default function App() {
       const auth = authOverride !== undefined ? authOverride : customAuth;
       const serialQuery = auth?.defaultSerial ? `&serial=${encodeURIComponent(auth.defaultSerial)}` : '';
       const [chartRes, tableRes] = await Promise.all([
-        fetch(`/api/telemetry/day-chart?date=${date}${serialQuery}`, { headers: getAuthHeaders(auth) }),
-        fetch(`/api/telemetry/table?date=${date}&rows=500${serialQuery}`, { headers: getAuthHeaders(auth) }),
+        fetch(`${API_BASE_URL}/telemetry/day-chart?date=${date}${serialQuery}`, { headers: getAuthHeaders(auth) }),
+        fetch(`${API_BASE_URL}/telemetry/table?date=${date}&rows=500${serialQuery}`, { headers: getAuthHeaders(auth) }),
       ]);
       const chartJson = await chartRes.json();
       const tableJson = await tableRes.json();

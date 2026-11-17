@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Lock, User, Key, Server, CheckCircle2, AlertCircle, LogOut } from 'lucide-react';
 import { translations } from '../utils/i18n';
+import { API_BASE_URL } from '../utils/config';
 
 /**
  * AuthModal
@@ -35,7 +36,7 @@ export default function AuthModal({
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
