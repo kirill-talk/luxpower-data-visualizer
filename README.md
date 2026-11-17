@@ -91,8 +91,9 @@ This repository includes a preconfigured GitHub Actions workflow (`.github/workf
 
 When hosted on GitHub Pages:
 1. The app runs completely client-side.
-2. User authentication and telemetry requests are securely routed through a Cloudflare Worker or the gateway proxy.
+2. User authentication and telemetry requests are routed through the serverless Cloudflare Worker (`https://luxpower-proxy.kirill-talk.workers.dev/api`).
 3. Credentials and session tokens are preserved securely in the user's browser `localStorage`.
+4. No central backend or dedicated server is required!
 
 ---
 
