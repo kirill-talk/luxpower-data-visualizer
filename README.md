@@ -2,7 +2,7 @@
 
 A modern, high-precision web dashboard and telemetry visualization interface for **Luxpower** hybrid inverters (including SNA 5000 / SNA 6000 Wide PV and other Luxpowertek ecosystem units).
 
-Live Instance: **[data-visualizer.kidev.uk](https://data-visualizer.kidev.uk/)**
+Live Demo: **[GitHub Pages](https://kirill-talk.github.io/luxpower-data-visualizer/)**
 
 ---
 
