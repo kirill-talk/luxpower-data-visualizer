@@ -299,7 +299,9 @@ export default function PowerFlowChart({ rawData, onZoomChange, lang = 'uk' }) {
           xAxisIndex: [0],
           start: 0,
           end: 100,
-          zoomOnMouseWheel: 'ctrl',
+          zoomOnMouseWheel: true,
+          moveOnMouseMove: true,
+          moveOnMouseWheel: false,
         },
         {
           type: 'slider',

@@ -1364,25 +1364,27 @@ export default function App() {
                   />
                 </section>
 
-                {/* Detailed 24h consumption curve for the selected day */}
-                <section
-                  className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col gap-5"
-                >
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-white/[0.06]">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-500">
-                        <Home className="w-4 h-4" />
+                {/* Detailed 24h consumption curve only shown when single day (1d) is selected */}
+                {periodMode === '1d' && (
+                  <section
+                    className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col gap-5"
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-white/[0.06]">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-500">
+                          <Home className="w-4 h-4" />
+                        </div>
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                          {t.secPowerFlowTitle} ({selectedDate})
+                        </h3>
                       </div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                        {t.secPowerFlowTitle} ({selectedDate})
-                      </h3>
+                      <span className="text-xs font-mono text-slate-400">
+                        {rangeStartTime} - {rangeEndTime}
+                      </span>
                     </div>
-                    <span className="text-xs font-mono text-slate-400">
-                      {rangeStartTime} - {rangeEndTime}
-                    </span>
-                  </div>
-                  <PowerFlowChart rawData={chartData} onZoomChange={setRangePoints} lang={lang} />
-                </section>
+                    <PowerFlowChart rawData={chartData} onZoomChange={setRangePoints} lang={lang} />
+                  </section>
+                )}
               </div>
             )}
 

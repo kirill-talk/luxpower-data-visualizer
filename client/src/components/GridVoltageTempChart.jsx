@@ -214,7 +214,9 @@ export default function GridVoltageTempChart({ tableRows, onZoomChange, lang = '
           xAxisIndex: [0],
           start: 0,
           end: 100,
-          zoomOnMouseWheel: 'ctrl',
+          zoomOnMouseWheel: true,
+          moveOnMouseMove: true,
+          moveOnMouseWheel: false,
         },
         {
           type: 'slider',
