@@ -1,0 +1,23 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: data-visualizer:latest
+    container_name: data-visualizer
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - '3001:3001'
+    networks:
+      - web
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.data-visualizer.rule=Host(`data-visualizer.test`) || Host(`data-visualizer.kidev.uk`)'
+      - 'traefik.http.routers.data-visualizer.entrypoints=web'
+      - 'traefik.http.services.data-visualizer.loadbalancer.server.port=3001'
+
+networks:
+  web:
+    external: true

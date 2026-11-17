@@ -1,0 +1,7 @@
+node_modules
+.git
+sample_*.json
+overview_result.json
+energy_result.json
+client/node_modules
+client/dist

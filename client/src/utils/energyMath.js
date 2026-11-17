@@ -1,0 +1,292 @@
+/**
+ * Utility functions for energy calculations, normalization, and interval integrations.
+ */
+
+export function parseInverterPoint(point) {
+  if (!point) return null;
+
+  const solarPv = Math.max(0, parseFloat(point.solarPv) || 0);
+  
+  // In dayMultiLine API: gridPower < 0 means import from grid, > 0 means export
+  const rawGrid = parseFloat(point.gridPower) || 0;
+  const gridImport = Math.max(0, -rawGrid);
+
+  // In dayMultiLine API: batteryDischarging > 0 means discharge, < 0 means charge
+  const rawBatt = parseFloat(point.batteryDischarging) || 0;
+  const batteryDischarge = Math.max(0, rawBatt);
+  const batteryCharge = Math.max(0, -rawBatt);
+
+  // Home consumption
+  const consumption = Math.max(0, parseFloat(point.consumption) || 0);
+
+  // Inverter self consumption (losses)
+  // Input: gridImport + solarPv + batteryDischarge
+  // Output: consumption + batteryCharge
+  const inputPower = gridImport + solarPv + batteryDischarge;
+  const outputPower = consumption + batteryCharge;
+  const inverterLoss = Math.max(0, Math.round(inputPower - outputPower));
+
+  const soc = parseFloat(point.soc) || 0;
+
+  return {
+    time: point.time,
+    solarPv,
+    gridImport,
+    batteryDischarge,
+    batteryCharge,
+    batteryPowerNet: rawBatt, // >0 discharge, <0 charge
+    consumption,
+    inverterLoss,
+    soc,
+  };
+}
+
+/**
+ * Numerically integrate a power series (in Watts) across timestamps to get energy in kWh.
+ * Uses trapezoidal rule based on time deltas in hours.
+ */
+export function integrateEnergy(points) {
+  if (!points || points.length < 2) {
+    return {
+      gridImportKwh: 0,
+      consumptionKwh: 0,
+      batteryChargeKwh: 0,
+      batteryDischargeKwh: 0,
+      inverterLossKwh: 0,
+      solarPvKwh: 0,
+      durationHours: 0,
+    };
+  }
+
+  let gridImportKwh = 0;
+  let consumptionKwh = 0;
+  let batteryChargeKwh = 0;
+  let batteryDischargeKwh = 0;
+  let inverterLossKwh = 0;
+  let solarPvKwh = 0;
+
+  let totalSeconds = 0;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+
+    const t1 = new Date(p1.time.replace(/-/g, '/')).getTime();
+    const t2 = new Date(p2.time.replace(/-/g, '/')).getTime();
+    const dtSeconds = Math.max(0, (t2 - t1) / 1000);
+
+    // If gap between points is more than 30 mins (e.g. data outage), cap or treat as 6 mins
+    const validDeltaSec = dtSeconds > 1800 ? 360 : dtSeconds;
+    const dtHours = validDeltaSec / 3600;
+    totalSeconds += validDeltaSec;
+
+    gridImportKwh += ((p1.gridImport + p2.gridImport) / 2) * dtHours / 1000;
+    consumptionKwh += ((p1.consumption + p2.consumption) / 2) * dtHours / 1000;
+    batteryChargeKwh += ((p1.batteryCharge + p2.batteryCharge) / 2) * dtHours / 1000;
+    batteryDischargeKwh += ((p1.batteryDischarge + p2.batteryDischarge) / 2) * dtHours / 1000;
+    inverterLossKwh += ((p1.inverterLoss + p2.inverterLoss) / 2) * dtHours / 1000;
+    solarPvKwh += ((p1.solarPv + p2.solarPv) / 2) * dtHours / 1000;
+  }
+
+  return {
+    gridImportKwh: parseFloat(gridImportKwh.toFixed(2)),
+    consumptionKwh: parseFloat(consumptionKwh.toFixed(2)),
+    batteryChargeKwh: parseFloat(batteryChargeKwh.toFixed(2)),
+    batteryDischargeKwh: parseFloat(batteryDischargeKwh.toFixed(2)),
+    inverterLossKwh: parseFloat(inverterLossKwh.toFixed(2)),
+    solarPvKwh: parseFloat(solarPvKwh.toFixed(2)),
+    durationHours: parseFloat((totalSeconds / 3600).toFixed(1)),
+  };
+}
+
+/**
+ * Normalizes live / table inverter voltage and frequency
+ */
+export function normalizeGridAndEps(liveData, latestRow) {
+  // Live vacr / fac often have scale 10 / 100 (e.g. 2219 -> 221.9V, 5000 -> 50.0Hz)
+  let vac = 0;
+  let fac = 0;
+  let isGridOnline = false;
+
+  if (liveData) {
+    const rawVacr = parseFloat(liveData.vacr) || 0;
+    const rawVepsr = parseFloat(liveData.vepsr) || 0;
+    const rawFac = parseFloat(liveData.fac) || 0;
+    const rawFeps = parseFloat(liveData.feps) || 0;
+
+    if (rawVacr > 500) {
+      // Scale 10
+      vac = rawVacr / 10;
+      fac = rawFac > 1000 ? rawFac / 100 : rawFac;
+      isGridOnline = true;
+    } else if (rawVacr > 50) {
+      // Standard scale
+      vac = rawVacr;
+      fac = rawFac;
+      isGridOnline = true;
+    } else if (rawVepsr > 0) {
+      // Off-grid EPS mode
+      vac = rawVepsr > 500 ? rawVepsr / 10 : rawVepsr;
+      fac = rawFeps > 1000 ? rawFeps / 100 : rawFeps;
+      isGridOnline = false;
+    }
+  } else if (latestRow) {
+    const rowVac = parseFloat(latestRow.vacr) || 0;
+    const rowVeps = parseFloat(latestRow.vepsr) || 0;
+    const rowFac = parseFloat(latestRow.fac) || 0;
+    const rowFeps = parseFloat(latestRow.feps) || 0;
+
+    if (rowVac > 50) {
+      vac = rowVac;
+      fac = rowFac;
+      isGridOnline = true;
+    } else {
+      vac = rowVeps || 230;
+      fac = rowFeps || 50;
+      isGridOnline = false;
+    }
+  }
+
+  return {
+    voltage: vac > 0 ? vac.toFixed(1) : '230.0',
+    frequency: fac > 0 ? fac.toFixed(1) : '50.0',
+    isGridOnline,
+  };
+}
+
+/**
+ * Calculates current operating mode duration, daily totals (battery vs grid),
+ * and estimated remaining runtime on battery based on average discharge/consumption during the outage.
+ */
+export function calculatePowerSourceDurations(tableRows, isCurrentGridOnline, currentSoc = null) {
+  if (!tableRows || !tableRows.length) {
+    return {
+      currentModeSince: null,
+      currentModeDurationSec: 0,
+      totalBatterySec: 0,
+      totalGridSec: 0,
+      estimatedRemainingSec: null,
+      avgConsumptionDuringOutage: 0,
+    };
+  }
+
+  // 1. Current streak duration & rows (newest to oldest)
+  let currentStreakSec = 0;
+  let streakStartTime = null;
+  const streakRows = [];
+
+  for (let i = 0; i < tableRows.length; i++) {
+    const row = tableRows[i];
+    const isGrid = (parseFloat(row.vacr) || 0) > 50;
+
+    if (isGrid === isCurrentGridOnline) {
+      streakStartTime = row.time;
+      streakRows.push(row);
+    } else {
+      break;
+    }
+  }
+
+  if (streakStartTime) {
+    const tStart = new Date(streakStartTime.replace(/-/g, '/')).getTime();
+    const tLatest = new Date(tableRows[0].time.replace(/-/g, '/')).getTime();
+    currentStreakSec = Math.max(0, Math.floor((tLatest - tStart) / 1000));
+  }
+
+  // 2. Total daily durations (oldest to newest)
+  const sorted = [...tableRows].sort((a, b) => {
+    return new Date(a.time.replace(/-/g, '/')).getTime() - new Date(b.time.replace(/-/g, '/')).getTime();
+  });
+
+  let totalBatterySec = 0;
+  let totalGridSec = 0;
+
+  for (let i = 0; i < sorted.length; i++) {
+    const r = sorted[i];
+    const isGrid = (parseFloat(r.vacr) || 0) > 50;
+
+    let dt = 360; // 6 mins default sample interval
+    if (i < sorted.length - 1) {
+      const t1 = new Date(r.time.replace(/-/g, '/')).getTime();
+      const t2 = new Date(sorted[i + 1].time.replace(/-/g, '/')).getTime();
+      const diff = Math.floor((t2 - t1) / 1000);
+      if (diff > 0 && diff <= 1800) {
+        dt = diff;
+      }
+    }
+
+    if (isGrid) {
+      totalGridSec += dt;
+    } else {
+      totalBatterySec += dt;
+    }
+  }
+
+  // 3. Estimated remaining battery runtime if currently offline (on battery)
+  let estimatedRemainingSec = null;
+  let avgConsumptionDuringOutage = 0;
+
+  if (!isCurrentGridOnline && streakRows.length > 0) {
+    // Average discharge / load power during the outage streak (Watts)
+    let sumDischarge = 0;
+    streakRows.forEach((r) => {
+      const pDis = parseFloat(r.pDisCharge) || parseFloat(r.peps) || parseFloat(r.pLoad) || 0;
+      sumDischarge += pDis;
+    });
+    avgConsumptionDuringOutage = Math.round(sumDischarge / streakRows.length);
+
+    // Current SOC value
+    const latestSocNum = currentSoc !== null
+      ? parseFloat(String(currentSoc).replace('%', ''))
+      : parseFloat(String(streakRows[0].soc || '0').replace('%', ''));
+
+    // Check SOC at start of outage
+    const oldestStreakRow = streakRows[streakRows.length - 1];
+    const startSocNum = parseFloat(String(oldestStreakRow.soc || '100').replace('%', ''));
+    const socDelta = startSocNum - latestSocNum;
+    const elapsedHours = currentStreakSec / 3600;
+
+    if (elapsedHours > 0.2 && socDelta > 1) {
+      // Approach A: Observed burn rate (% SOC consumed per hour)
+      const burnRatePerHour = socDelta / elapsedHours;
+      const hoursRemaining = Math.max(0, latestSocNum / burnRatePerHour);
+      estimatedRemainingSec = Math.round(hoursRemaining * 3600);
+    } else if (avgConsumptionDuringOutage > 0) {
+      // Approach B: Capacity energy model (nominal 100Ah/200Ah ~ 5.12kWh-10kWh, default ~5000Wh)
+      // Wh remaining = (latestSocNum / 100) * 5120Wh
+      const remainingWh = (Math.max(0, latestSocNum) / 100) * 5120;
+      const hoursRemaining = remainingWh / avgConsumptionDuringOutage;
+      estimatedRemainingSec = Math.round(hoursRemaining * 3600);
+    }
+  }
+
+  return {
+    currentModeSince: streakStartTime,
+    currentModeDurationSec: currentStreakSec,
+    totalBatterySec,
+    totalGridSec,
+    estimatedRemainingSec,
+    avgConsumptionDuringOutage,
+  };
+}
+
+/**
+ * Formats duration in seconds to "Xh Ym Zs" or "Xh Ym"
+ */
+export function formatDurationHuman(seconds, isEn = false, includeSeconds = true) {
+  if (!seconds || seconds <= 0) {
+    return includeSeconds ? `00:00:00` : `0${isEn ? 'h' : 'г'} 00${isEn ? 'm' : 'хв'}`;
+  }
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+
+  if (includeSeconds) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  }
+
+  const hUnit = isEn ? 'h' : 'г';
+  const mUnit = isEn ? 'm' : 'хв';
+  return `${h}${hUnit} ${String(m).padStart(2, '0')}${mUnit}`;
+}
