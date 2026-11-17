@@ -14,12 +14,24 @@ Live Demo: **[GitHub Pages](https://kirill-talk.github.io/luxpower-data-visualiz
     - **Consumption (Home Load)**: Amber (`#f59e0b`)
     - **Battery**: Emerald (`#10b981`) when charging, Rose (`#f43f5e`) when discharging
     - **Grid Import**: Rose (`#f43f5e`) during active import, Emerald when bypass / normal
-    - **Inverter & Losses**: Purple (`#a855f7`)
-  - Full interactive view for desktop displays (1200px+) and a streamlined mobile-first layout for phones and tablets (<1200px).
+    - **Inverter Consumption**: Purple (`#a855f7`)
+  - Full interactive schematic for desktop displays (1200px+) and a streamlined mobile-first layout for phones and tablets.
 - **Telemetry Instrument Strip (KPIs)**:
   - **Power Source Uptime Timer**: Real-time ticking stopwatch (`HH:MM:SS`) tracking continuous duration of current mode (*"On Battery"* vs *"On Grid"*), with cumulative 24-hour totals for each source.
-  - **Estimated Battery Autonomy**: Projected remaining runtime (`~Xh Ym`) dynamically computed from the battery's real discharge burn-rate and home consumption since the outage began.
+  - **Estimated Battery Autonomy**: Projected remaining runtime (`~Xh Ym`) dynamically computed from the battery's real discharge burn-rate and home consumption, with an enforced **15% BMS cutoff threshold** (useful runtime strictly calculated down to BMS shutdown point).
+  - **Estimated Time to Full Charge**: Real-time projected time until 100% battery charge with a realistic 2-stage charging model (bulk constant current charging up to 85%, and absorption power taper down to ~1 kW from 85% to 100%).
   - Complete state metrics: SOC %, battery charge/discharge wattage, current (A), pack voltage, heatsink/inverter temperatures.
+- **Period Statistics & Energy Analytics**:
+  - Period overview with quick filters (**1d**, **1w**, **1m**, or custom date range).
+  - Aggregate metrics: Total Consumption, Total Grid Import, Total Battery Discharge, and Inverter Consumption.
+  - **Dual-Tariff Electricity Cost Calculator**: Dynamic calculation for Ukrainian 2-zone power tariffs:
+    - Night rate (23:00 – 06:59): **2.16 ₴ / kWh**
+    - Day rate (07:00 – 22:59): **4.32 ₴ / kWh**
+    - Financial breakdown for total grid import and internal inverter consumption costs.
+  - Autonomy share indicators showing the percentage of load supplied by battery vs grid.
+- **Client-Side High Performance Caching**:
+  - **IndexedDB Persistent Cache**: Historical completed days are cached in local browser storage (`luxpower_db`), eliminating redundant network calls and making month/week loads instantaneous.
+  - **Concurrency Pool with Auto-Retry**: Requests for missing historical dates are fetched in staggered batches (max 2 parallel requests with 60ms delay) to prevent Luxpower cloud rate-limiting.
 - **24-Hour Energy Balance & Profiles**:
   - Interactive 24-hour area chart with brush/zoom selection to calculate integrated energy sums (kWh) over any custom period.
   - Comprehensive battery charts (SOC, charge/discharge current, BMS voltage, temperature).
@@ -31,6 +43,7 @@ Live Demo: **[GitHub Pages](https://kirill-talk.github.io/luxpower-data-visualiz
   - Automated login from `.env` credentials for dedicated host deployments.
   - On-screen modal login with server selection (`eu.luxpowertek.com`, `server.luxpowertek.com`, `us.luxpowertek.com`) and browser session storage (`localStorage`), ready for static hosting and serverless proxy configurations.
 - **UX & Localization**:
+  - Tab navigation: **Dashboard (Головна)**, **Consumption (Споживання)**, **Battery & BMS (Батарея та BMS)**, **Grid & Temperature (Мережа та Температура)**, **Telemetry Logs (Журнал телеметрії)**.
   - Full bilingual support with one-click toggle (**EN** / **UA**).
   - Native dark and light themes with smooth transitions.
 
@@ -38,8 +51,9 @@ Live Demo: **[GitHub Pages](https://kirill-talk.github.io/luxpower-data-visualiz
 
 ## 🛠 Tech Stack
 
-- **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons, Apache ECharts.
+- **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons, Apache ECharts, IndexedDB API.
 - **Backend / Gateway**: Node.js, Express, Axios.
+- **Serverless Proxy**: Cloudflare Worker (`cloudflare-worker/worker.js`).
 - **Deployment**: Docker, Docker Compose, Traefik, GitHub Actions (GitHub Pages).
 
 ---
@@ -66,7 +80,7 @@ PORT=3001
 ```bash
 docker compose up -d --build
 ```
-Access the application at `http://localhost:3000` (or through your configured reverse proxy).
+Access the application at `http://localhost:3001` (or through your configured reverse proxy).
 
 ### 4. Local Development
 
@@ -92,8 +106,9 @@ This repository includes a preconfigured GitHub Actions workflow (`.github/workf
 When hosted on GitHub Pages:
 1. The app runs completely client-side.
 2. User authentication and telemetry requests are routed through the serverless Cloudflare Worker (`https://luxpower-proxy.kirill-talk.workers.dev/api`).
-3. Credentials and session tokens are preserved securely in the user's browser `localStorage`.
-4. No central backend or dedicated server is required!
+3. Historical day charts are cached client-side in **IndexedDB**.
+4. Credentials and session tokens are preserved securely in the user's browser `localStorage`.
+5. No central backend or dedicated server is required!
 
 ---
 
