@@ -81,43 +81,88 @@ class LuxpowerClient {
     }
   }
 
+  // Wrapper for requests that automatically re-authenticates on session expiration
+  async requestWithAuth(fn, customCookie = null) {
+    if (!customCookie) {
+      await this.ensureAuth();
+    }
+    try {
+      const res = await fn();
+      // If table endpoint redirects to login HTML
+      if (typeof res === 'string' && res.includes('<!DOCTYPE')) {
+        if (!customCookie && this.account && this.password) {
+          console.log('🔄 Session expired (HTML login redirect detected). Re-authenticating...');
+          await this.login(this.account, this.password);
+          const retryRes = await fn();
+          if (typeof retryRes === 'string' && retryRes.includes('<!DOCTYPE')) {
+            throw new Error('UNLOGIN_ERROR');
+          }
+          return retryRes;
+        }
+        const err = new Error('Session expired');
+        err.status = 401;
+        throw err;
+      }
+      return res;
+    } catch (err) {
+      const isAuthError = err.status === 401 ||
+        err.response?.status === 401 ||
+        err.response?.data?.msg === 'UNLOGIN_ERROR';
+
+      if (isAuthError) {
+        if (!customCookie && this.account && this.password) {
+          console.log('🔄 Session expired (401 / UNLOGIN_ERROR). Re-authenticating...');
+          await this.login(this.account, this.password);
+          return await fn();
+        }
+        const authErr = new Error('Session expired or unauthorized');
+        authErr.status = 401;
+        throw authErr;
+      }
+      throw err;
+    }
+  }
+
   async getInverterRuntime(serialNum, customCookie = null) {
-    if (!customCookie) await this.ensureAuth();
-    const res = await this.client.post('/WManage/api/inverter/getInverterRuntime', querystring.stringify({
-      serialNum,
-    }), {
-      headers: {
-        ...this.getHeaders(customCookie),
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      },
-    });
-    return res.data;
+    return this.requestWithAuth(async () => {
+      const res = await this.client.post('/WManage/api/inverter/getInverterRuntime', querystring.stringify({
+        serialNum,
+      }), {
+        headers: {
+          ...this.getHeaders(customCookie),
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        },
+      });
+      return res.data;
+    }, customCookie);
   }
 
   async getDayChart(serialNum, dateText, customCookie = null) {
-    if (!customCookie) await this.ensureAuth();
-    const res = await this.client.post('/WManage/api/analyze/chart/dayMultiLine', querystring.stringify({
-      serialNum,
-      dateText,
-    }), {
-      headers: {
-        ...this.getHeaders(customCookie),
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      },
-    });
-    return res.data;
+    return this.requestWithAuth(async () => {
+      const res = await this.client.post('/WManage/api/analyze/chart/dayMultiLine', querystring.stringify({
+        serialNum,
+        dateText,
+      }), {
+        headers: {
+          ...this.getHeaders(customCookie),
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        },
+      });
+      return res.data;
+    }, customCookie);
   }
 
   async getDayDataTable(serialNum, dateText, page = 1, rows = 300, customCookie = null) {
-    if (!customCookie) await this.ensureAuth();
-    const endpoint = `/WManage/web/analyze/data/${dateText}?serialNum=${serialNum}&page=${page}&rows=${rows}`;
-    const res = await this.client.post(endpoint, {}, {
-      headers: {
-        ...this.getHeaders(customCookie),
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      },
-    });
-    return res.data;
+    return this.requestWithAuth(async () => {
+      const endpoint = `/WManage/web/analyze/data/${dateText}?serialNum=${serialNum}&page=${page}&rows=${rows}`;
+      const res = await this.client.post(endpoint, {}, {
+        headers: {
+          ...this.getHeaders(customCookie),
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        },
+      });
+      return res.data;
+    }, customCookie);
   }
 }
 

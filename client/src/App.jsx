@@ -226,12 +226,27 @@ export default function App() {
     fetchHistory(selectedDate, null);
   };
 
+  // Helper to handle unauthorized (401 / session expired) responses
+  const handleUnauthorized = (overrideAuth = null) => {
+    const auth = overrideAuth !== undefined ? overrideAuth : customAuth;
+    if (auth) {
+      console.warn('⚠️ Custom session expired. Clearing cached session and prompting login.');
+      localStorage.removeItem('luxpower-custom-auth');
+      setCustomAuth(null);
+      setAuthModalOpen(true);
+    }
+  };
+
   const fetchStatus = async (authOverride = undefined) => {
     try {
       const auth = authOverride !== undefined ? authOverride : customAuth;
       const res = await apiFetch('/status', {
         headers: getAuthHeaders(auth)
       });
+      if (res.status === 401) {
+        handleUnauthorized(auth);
+        return;
+      }
       const data = await res.json();
       setStatus(data);
       // Auto open modal if completely unauthenticated (neither env nor custom auth)
@@ -250,6 +265,10 @@ export default function App() {
       const res = await apiFetch(`/telemetry/live${serialParam}`, {
         headers: getAuthHeaders(auth)
       });
+      if (res.status === 401) {
+        handleUnauthorized(auth);
+        return;
+      }
       const data = await res.json();
       setLiveData(data);
       setLastUpdated(new Date().toLocaleTimeString());
@@ -267,6 +286,10 @@ export default function App() {
         apiFetch(`/telemetry/day-chart?date=${date}${serialQuery}`, { headers: getAuthHeaders(auth) }),
         apiFetch(`/telemetry/table?date=${date}&rows=500${serialQuery}`, { headers: getAuthHeaders(auth) }),
       ]);
+      if (chartRes.status === 401 || tableRes.status === 401) {
+        handleUnauthorized(auth);
+        return;
+      }
       const chartJson = await chartRes.json();
       const tableJson = await tableRes.json();
 

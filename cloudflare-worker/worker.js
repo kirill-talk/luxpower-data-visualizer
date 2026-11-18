@@ -141,6 +141,25 @@ export default {
         });
       }
 
+      // Helper to execute Luxpower request and detect expired session / HTML redirect
+      async function fetchLuxJson(url, options) {
+        const res = await fetch(url, options);
+        const text = await res.text();
+        const trimmed = text.trim();
+        if (trimmed.startsWith('<') || trimmed.includes('<!DOCTYPE')) {
+          return { isAuthError: true, status: 401, error: 'Session expired (redirected to login)' };
+        }
+        try {
+          const json = JSON.parse(text);
+          if (json && (json.msg === 'UNLOGIN_ERROR' || res.status === 401)) {
+            return { isAuthError: true, status: 401, error: 'Session expired' };
+          }
+          return { ok: true, status: res.status, data: json };
+        } catch (e) {
+          return { isAuthError: false, status: res.status, error: 'Invalid response from Luxpower' };
+        }
+      }
+
       // 3. Realtime Live Telemetry
       if (pathname === '/api/telemetry/live' || pathname === '/telemetry/live') {
         const cookie = extractCookie(request);
@@ -153,7 +172,7 @@ export default {
         const formData = new URLSearchParams();
         formData.append('serialNum', serial);
 
-        const res = await fetch(`${targetBase}/WManage/api/inverter/getInverterRuntime`, {
+        const result = await fetchLuxJson(`${targetBase}/WManage/api/inverter/getInverterRuntime`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -162,8 +181,13 @@ export default {
           },
           body: formData.toString(),
         });
-        const data = await res.json();
-        return jsonResponse(data);
+        if (result.isAuthError) {
+          return jsonResponse({ error: result.error, code: 'UNLOGIN_ERROR' }, 401);
+        }
+        if (!result.ok) {
+          return jsonResponse({ error: result.error }, result.status || 500);
+        }
+        return jsonResponse(result.data);
       }
 
       // 4. 24h Profile Chart
@@ -180,7 +204,7 @@ export default {
         formData.append('serialNum', serial);
         formData.append('dateText', dateText);
 
-        const res = await fetch(`${targetBase}/WManage/api/analyze/chart/dayMultiLine`, {
+        const result = await fetchLuxJson(`${targetBase}/WManage/api/analyze/chart/dayMultiLine`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -189,8 +213,13 @@ export default {
           },
           body: formData.toString(),
         });
-        const data = await res.json();
-        return jsonResponse(data);
+        if (result.isAuthError) {
+          return jsonResponse({ error: result.error, code: 'UNLOGIN_ERROR' }, 401);
+        }
+        if (!result.ok) {
+          return jsonResponse({ error: result.error }, result.status || 500);
+        }
+        return jsonResponse(result.data);
       }
 
       // 5. Detailed Table Data
@@ -206,7 +235,7 @@ export default {
         }
 
         const endpoint = `${targetBase}/WManage/web/analyze/data/${dateText}?serialNum=${serial}&page=${page}&rows=${rows}`;
-        const res = await fetch(endpoint, {
+        const result = await fetchLuxJson(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -214,8 +243,13 @@ export default {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
           },
         });
-        const data = await res.json();
-        return jsonResponse(data);
+        if (result.isAuthError) {
+          return jsonResponse({ error: result.error, code: 'UNLOGIN_ERROR' }, 401);
+        }
+        if (!result.ok) {
+          return jsonResponse({ error: result.error }, result.status || 500);
+        }
+        return jsonResponse(result.data);
       }
 
       return jsonResponse({ error: 'Endpoint not found' }, 404);

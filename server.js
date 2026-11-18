@@ -88,11 +88,12 @@ app.post('/api/auth/login', async (req, res) => {
 // 1. System info / connection status
 app.get('/api/status', (req, res) => {
   const customCookie = extractClientCookie(req);
+  const serial = resolveSerial(req);
   res.json({
     connected: !!(customCookie || client.cookie),
     hasEnvCredentials: !!(process.env.LUX_ACCOUNT && process.env.LUX_PASSWORD),
     account: process.env.LUX_ACCOUNT || null,
-    defaultSerial: cachedSerial,
+    defaultSerial: serial,
     plant: cachedPlant,
     deviceInfo: client.deviceInfo,
   });
@@ -109,7 +110,8 @@ app.get('/api/telemetry/live', async (req, res) => {
     const data = await client.getInverterRuntime(serial, customCookie);
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = err.status || (err.response?.status === 401 ? 401 : 500);
+    res.status(status).json({ error: err.message });
   }
 });
 
@@ -125,7 +127,8 @@ app.get('/api/telemetry/day-chart', async (req, res) => {
     const data = await client.getDayChart(serial, dateText, customCookie);
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = err.status || (err.response?.status === 401 ? 401 : 500);
+    res.status(status).json({ error: err.message });
   }
 });
 
@@ -143,7 +146,8 @@ app.get('/api/telemetry/table', async (req, res) => {
     const data = await client.getDayDataTable(serial, dateText, page, rows, customCookie);
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = err.status || (err.response?.status === 401 ? 401 : 500);
+    res.status(status).json({ error: err.message });
   }
 });
 
