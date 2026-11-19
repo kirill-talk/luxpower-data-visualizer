@@ -27,6 +27,60 @@ const dongleClient = new LuxpowerDongleClient();
 let cachedSerial = process.env.LUX_INVERTER_SN || null;
 let cachedPlant = null;
 
+// Verified external session cookies allowed to read owner's LAN dongle when matching inverter SN
+const verifiedDongleCookies = new Map();
+const COOKIE_VERIFY_TTL_MS = 12 * 60 * 60 * 1000;
+
+function isExternalOrigin(req) {
+  const origin = req.headers.origin;
+  if (!origin) return false;
+  const host = (req.headers.host || '').split(':')[0].toLowerCase();
+  try {
+    const originHost = new URL(origin).hostname.toLowerCase();
+    if (!originHost) return false;
+    if (originHost === host || originHost === 'localhost' || originHost === '127.0.0.1') {
+      return false;
+    }
+    if (process.env.APP_DOMAIN && originHost === process.env.APP_DOMAIN.toLowerCase()) {
+      return false;
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function getClientForRequest(req) {
+  const reqServer = req.headers['x-lux-server'];
+  if (reqServer && reqServer.trim() && reqServer.trim().replace(/\/+$/, '') !== client.baseUrl) {
+    return new LuxpowerClient(reqServer.trim());
+  }
+  return client;
+}
+
+async function isAuthorizedForDongle(req, customCookie, serial) {
+  if (!dongleClient.isConfigured()) return false;
+  const targetSerial = serial || (!isExternalOrigin(req) ? dongleClient.inverterSn : null);
+  if (!targetSerial || targetSerial !== dongleClient.inverterSn) return false;
+  if (!isExternalOrigin(req)) return true;
+  if (!customCookie) return false;
+
+  const expiresAt = verifiedDongleCookies.get(customCookie);
+  if (expiresAt && Date.now() < expiresAt) return true;
+
+  try {
+    const reqClient = getClientForRequest(req);
+    const check = await reqClient.getInverterRuntime(dongleClient.inverterSn, customCookie);
+    if (check && check.success) {
+      verifiedDongleCookies.set(customCookie, Date.now() + COOKIE_VERIFY_TTL_MS);
+      return true;
+    }
+  } catch {
+    // Cookie invalid or expired for this inverter
+  }
+  return false;
+}
+
 async function initLuxpower() {
   const account = process.env.LUX_ACCOUNT;
   const password = process.env.LUX_PASSWORD;
@@ -78,17 +132,21 @@ function extractClientCookie(req) {
 }
 
 function resolveSerial(req) {
-  return req.query.serial || req.headers['x-lux-serial'] || cachedSerial || dongleClient.inverterSn;
+  const explicit = req.query.serial || req.headers['x-lux-serial'];
+  if (explicit) return explicit;
+  if (isExternalOrigin(req)) return null;
+  return cachedSerial || dongleClient.inverterSn;
 }
 
 // 0. Explicit Login endpoint for user authentication
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { account, password } = req.body;
+    const { account, password, server } = req.body;
     if (!account || !password) {
       return res.status(400).json({ success: false, error: 'Account and password required' });
     }
-    const tempClient = new LuxpowerClient(process.env.LUX_BASE_URL || 'https://eu.luxpowertek.com');
+    const luxBase = (server && server.trim()) || process.env.LUX_BASE_URL || 'https://eu.luxpowertek.com';
+    const tempClient = new LuxpowerClient(luxBase);
     const auth = await tempClient.login(account, password);
 
     if (!auth.cookie) {
@@ -102,6 +160,10 @@ app.post('/api/auth/login', async (req, res) => {
       if (plant.inverters && plant.inverters.length > 0) {
         userSerial = plant.inverters[0].serialNum;
       }
+    }
+
+    if (dongleClient.inverterSn && userSerial === dongleClient.inverterSn) {
+      verifiedDongleCookies.set(auth.cookie, Date.now() + COOKIE_VERIFY_TTL_MS);
     }
 
     res.json({
@@ -118,9 +180,36 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // 1. System info / connection status
-app.get('/api/status', (req, res) => {
+app.get('/api/status', async (req, res) => {
   const customCookie = extractClientCookie(req);
+  const external = isExternalOrigin(req);
+
+  if (external && !customCookie) {
+    return res.json({
+      connected: false,
+      hasEnvCredentials: false,
+      account: null,
+      defaultSerial: null,
+      dataSource: 'cloud',
+      dongleEnabled: false,
+      dongleConnected: false,
+    });
+  }
+
   const serial = resolveSerial(req);
+  if (external && customCookie) {
+    const dongleOk = await isAuthorizedForDongle(req, customCookie, serial);
+    const dongleStatus = dongleOk ? dongleClient.getStatus() : { dongleEnabled: false, dongleConnected: false };
+    return res.json({
+      connected: true,
+      hasEnvCredentials: false,
+      account: null,
+      defaultSerial: serial,
+      dataSource: dongleStatus.dongleConnected ? 'dongle' : 'cloud',
+      ...dongleStatus,
+    });
+  }
+
   const dongleStatus = dongleClient.getStatus();
   res.json({
     connected: !!(customCookie || client.cookie || dongleStatus.dongleConnected),
@@ -138,8 +227,12 @@ app.get('/api/status', (req, res) => {
 app.get('/api/telemetry/live', async (req, res) => {
   try {
     const customCookie = extractClientCookie(req);
+    if (isExternalOrigin(req) && !customCookie) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const serial = resolveSerial(req);
-    const canUseDongle = dongleClient.isConfigured() && (!serial || serial === dongleClient.inverterSn);
+    const canUseDongle = await isAuthorizedForDongle(req, customCookie, serial);
 
     if (canUseDongle) {
       try {
@@ -153,7 +246,8 @@ app.get('/api/telemetry/live', async (req, res) => {
     if (!serial) {
       return res.status(400).json({ error: 'No serial number available' });
     }
-    const data = await client.getInverterRuntime(serial, customCookie);
+    const reqClient = getClientForRequest(req);
+    const data = await reqClient.getInverterRuntime(serial, customCookie);
     res.json({ ...data, source: 'cloud' });
   } catch (err) {
     const status = err.status || (err.response?.status === 401 ? 401 : 500);
@@ -164,11 +258,15 @@ app.get('/api/telemetry/live', async (req, res) => {
 // 3. Day MultiLine Chart Data (Cloud history + newer Dongle points for today)
 app.get('/api/telemetry/day-chart', async (req, res) => {
   const customCookie = extractClientCookie(req);
+  if (isExternalOrigin(req) && !customCookie) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
   const serial = resolveSerial(req);
   const todayStr = dongleClient.getInverterTimeInfo().dateStr;
   const dateText = req.query.date || todayStr;
   const isToday = dateText === todayStr;
-  const canUseDongle = isToday && dongleClient.isConfigured() && (!serial || serial === dongleClient.inverterSn);
+  const canUseDongle = isToday && (await isAuthorizedForDongle(req, customCookie, serial));
 
   if (canUseDongle && !dongleClient.cachedResult) {
     try {
@@ -183,7 +281,8 @@ app.get('/api/telemetry/day-chart', async (req, res) => {
     if (!serial) {
       return res.status(400).json({ error: 'No serial number available' });
     }
-    const data = await client.getDayChart(serial, dateText, customCookie);
+    const reqClient = getClientForRequest(req);
+    const data = await reqClient.getDayChart(serial, dateText, customCookie);
     if (donglePoints.length > 0 && data && Array.isArray(data.data)) {
       const lastCloudTime = data.data.length > 0 ? data.data[data.data.length - 1].time : '';
       const newerPoints = donglePoints.filter((p) => !lastCloudTime || p.time > lastCloudTime);
@@ -193,7 +292,7 @@ app.get('/api/telemetry/day-chart', async (req, res) => {
     }
     res.json(data);
   } catch (err) {
-    if (donglePoints.length > 0) {
+    if (donglePoints.length > 0 && err.status !== 401) {
       return res.json({ success: true, source: 'dongle', data: donglePoints });
     }
     const status = err.status || (err.response?.status === 401 ? 401 : 500);
@@ -204,13 +303,17 @@ app.get('/api/telemetry/day-chart', async (req, res) => {
 // 4. Day detailed table data (Cloud history + newer Dongle rows for today)
 app.get('/api/telemetry/table', async (req, res) => {
   const customCookie = extractClientCookie(req);
+  if (isExternalOrigin(req) && !customCookie) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
   const serial = resolveSerial(req);
   const todayStr = dongleClient.getInverterTimeInfo().dateStr;
   const dateText = req.query.date || todayStr;
   const page = parseInt(req.query.page, 10) || 1;
   const rows = parseInt(req.query.rows, 10) || 500;
   const isToday = dateText === todayStr;
-  const canUseDongle = isToday && page === 1 && dongleClient.isConfigured() && (!serial || serial === dongleClient.inverterSn);
+  const canUseDongle = isToday && page === 1 && (await isAuthorizedForDongle(req, customCookie, serial));
 
   if (canUseDongle && !dongleClient.cachedResult) {
     try {
@@ -225,7 +328,8 @@ app.get('/api/telemetry/table', async (req, res) => {
     if (!serial) {
       return res.status(400).json({ error: 'No serial number available' });
     }
-    const data = await client.getDayDataTable(serial, dateText, page, rows, customCookie);
+    const reqClient = getClientForRequest(req);
+    const data = await reqClient.getDayDataTable(serial, dateText, page, rows, customCookie);
     if (dongleRows.length > 0 && data && Array.isArray(data.rows)) {
       const newestCloudTime = data.rows.length > 0 ? data.rows[0].time : '';
       const newerRows = dongleRows.filter((r) => !newestCloudTime || r.time > newestCloudTime);
@@ -238,7 +342,7 @@ app.get('/api/telemetry/table', async (req, res) => {
     }
     res.json(data);
   } catch (err) {
-    if (dongleRows.length > 0) {
+    if (dongleRows.length > 0 && err.status !== 401) {
       return res.json({ total: dongleRows.length, rows: dongleRows, source: 'dongle' });
     }
     const status = err.status || (err.response?.status === 401 ? 401 : 500);

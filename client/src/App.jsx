@@ -206,6 +206,9 @@ export default function App() {
     if (auth && auth.defaultSerial) {
       headers['x-lux-serial'] = auth.defaultSerial;
     }
+    if (auth && auth.server) {
+      headers['x-lux-server'] = auth.server;
+    }
     return headers;
   };
 
@@ -234,8 +237,8 @@ export default function App() {
       console.warn('⚠️ Custom session expired. Clearing cached session and prompting login.');
       localStorage.removeItem('luxpower-custom-auth');
       setCustomAuth(null);
-      setAuthModalOpen(true);
     }
+    setAuthModalOpen(true);
   };
 
   const fetchStatus = async (authOverride = undefined) => {
@@ -653,10 +656,10 @@ export default function App() {
     return calculateTimeToFullCharge(soc, battCharge);
   }, [soc, battCharge]);
 
-  // Dynamic battery cycle count and SOH estimation for 2× Dyness B4850
+  // Dynamic battery cycle count and SOH estimation
   const batteryHealth = useMemo(() => {
-    return calculateBatteryHealth(latestRow, liveData);
-  }, [latestRow, liveData]);
+    return calculateBatteryHealth(latestRow, liveData, status);
+  }, [latestRow, liveData, status]);
 
   // Real-time battery current (A): liveData.bmsBatCurrent is scaled x100, table bmsBatCurrent is x1
   const batteryCurrent = useMemo(() => {
@@ -897,7 +900,7 @@ export default function App() {
                   )}
                 </div>
                 <div className="text-[10px] sm:text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 truncate">
-                  <span>SN: <strong className="font-semibold text-slate-700 dark:text-slate-200">{status?.defaultSerial || '—'}</strong></span>
+                  <span>SN: <strong className="font-semibold text-slate-700 dark:text-slate-200">{customAuth?.defaultSerial || status?.defaultSerial || liveData?.serialNum || '—'}</strong></span>
                   <span className="text-slate-300 dark:text-slate-600">•</span>
                   <span>SNA 6K</span>
                   {lastUpdated && (
@@ -1045,7 +1048,7 @@ export default function App() {
             {/* MOBILE ONLY (< xl / < 1200px): QUICK STATUS BAR, KPI & COMPACT POWER FLOW */}
             <div className="flex flex-col gap-4 xl:hidden">
               <MobileStatusBar
-                serialNumber={status?.defaultSerial || '—'}
+                serialNumber={customAuth?.defaultSerial || status?.defaultSerial || liveData?.serialNum || '—'}
                 lastUpdated={lastUpdated}
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}

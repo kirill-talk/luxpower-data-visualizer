@@ -45,18 +45,22 @@ export default function MobilePowerFlowDiagram({
   const unitKwh = isEn ? 'kWh' : 'кВт·год';
 
   const {
-    model: batteryModel = '2× Dyness B4850',
-    bat1Cycles = 173,
-    bat2Cycles = 66,
-    avgCycles = 120,
-    bat1Soh = '99.1',
-    bat2Soh = '99.6',
-    avgSoh = '99.3',
-    bat1Kwh = 415.3,
-    bat2Kwh = 157.8,
+    isSplitModules = false,
+    model: batteryModel = 'LiFePO4',
+    bat1Cycles = 0,
+    bat2Cycles = 0,
+    avgCycles = 0,
+    bat1Soh = '100.0',
+    bat2Soh = '100.0',
+    avgSoh = '100.0',
+    bat1Kwh = 0,
+    bat2Kwh = 0,
+    totalDisChgKwh = 0,
   } = batteryHealth || {};
 
-  const batteryTitleTooltip = `B1 (11.2025): ${bat1Soh}% (${bat1Kwh} ${unitKwh})\nB2 (02.2026): ${bat2Soh}% (${bat2Kwh} ${unitKwh})`;
+  const batteryTitleTooltip = isSplitModules
+    ? `B1 (11.2025): ${bat1Soh}% (${bat1Kwh} ${unitKwh})\nB2 (02.2026): ${bat2Soh}% (${bat2Kwh} ${unitKwh})`
+    : `${isEn ? 'Lifetime discharge' : 'Загальний розряд'}: ${totalDisChgKwh} ${unitKwh} (${avgCycles} ${isEn ? 'cycles' : 'циклів'})`;
 
   const isCharging = batteryPower > 0;
   const isDischarging = batteryPower < 0;
@@ -222,8 +226,14 @@ export default function MobilePowerFlowDiagram({
                     </span>
                   </span>
                   <div className="pointer-events-none opacity-0 group-hover/batTitle:opacity-100 transition-opacity duration-150 absolute left-0 bottom-full mb-1.5 z-50 w-max max-w-xs rounded-lg bg-slate-900 dark:bg-slate-800 text-white border border-slate-700/80 shadow-xl px-2.5 py-1.5 text-[10px] font-mono leading-relaxed">
-                    <div>B1 (11.2025): {bat1Soh}% ({bat1Kwh} {unitKwh})</div>
-                    <div>B2 (02.2026): {bat2Soh}% ({bat2Kwh} {unitKwh})</div>
+                    {isSplitModules ? (
+                      <>
+                        <div>B1 (11.2025): {bat1Soh}% ({bat1Kwh} {unitKwh})</div>
+                        <div>B2 (02.2026): {bat2Soh}% ({bat2Kwh} {unitKwh})</div>
+                      </>
+                    ) : (
+                      <div>{isEn ? 'Lifetime discharge' : 'Загальний розряд'}: {totalDisChgKwh} {unitKwh}</div>
+                    )}
                   </div>
                 </div>
                 <span className="text-[10px] font-mono text-slate-400">
@@ -275,11 +285,17 @@ export default function MobilePowerFlowDiagram({
 
           <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-200/40 dark:border-white/[0.04] text-[10px] font-mono text-slate-500 dark:text-slate-400">
             <span title={isEn ? `Avg: ${avgCycles} cycles` : `Сер.: ${avgCycles} циклів`}>
-              B1: <strong className="text-slate-700 dark:text-slate-200">{bat1Cycles}</strong> / B2: <strong className="text-slate-700 dark:text-slate-200">{bat2Cycles}</strong> {isEn ? 'cycles' : 'циклів'}
+              {isSplitModules ? (
+                <>B1: <strong className="text-slate-700 dark:text-slate-200">{bat1Cycles}</strong> / B2: <strong className="text-slate-700 dark:text-slate-200">{bat2Cycles}</strong> {isEn ? 'cycles' : 'циклів'}</>
+              ) : (
+                <><strong className="text-slate-700 dark:text-slate-200">{avgCycles}</strong> {isEn ? 'cycles' : 'циклів'}</>
+              )}
             </span>
-            <span title={`B1: ${bat1Soh}% • B2: ${bat2Soh}%`}>
-              SOH: <strong className="text-slate-700 dark:text-slate-200">{avgSoh}%</strong>{' '}
-              <span className="text-[9px] text-slate-400">({bat1Soh}% / {bat2Soh}%)</span>
+            <span title={isSplitModules ? `B1: ${bat1Soh}% • B2: ${bat2Soh}%` : `SOH: ${avgSoh}%`}>
+              SOH: <strong className="text-slate-700 dark:text-slate-200">{avgSoh}%</strong>
+              {isSplitModules && (
+                <> <span className="text-[9px] text-slate-400">({bat1Soh}% / {bat2Soh}%)</span></>
+              )}
             </span>
           </div>
         </div>

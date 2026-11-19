@@ -446,60 +446,104 @@ export function formatDurationHuman(seconds, isEn = false, includeSeconds = true
 }
 
 /**
- * Calculates dynamic cycle counts and State of Health (SOH) for 2× Dyness B4850 modules
- * based on cumulative inverter discharge energy (eDisChgAll).
+ * Calculates dynamic cycle counts and State of Health (SOH) for battery modules.
  *
- * Battery #1 commissioned: 2025-11-16 (solo until 2026-02-14 15:24, eDisChgAll = 257.5 kWh).
- * Battery #2 added: 2026-02-14 15:24 (parallel equal split for all energy after 257.5 kWh).
- * Nominal module energy: 48V * 50Ah = 2.4 kWh (rated 6000 cycles to 80% SOH).
+ * - For the owner's 2× Dyness B4850 pack (when dongle telemetry is active and BMS cycle counter is 0),
+ *   partitions cumulative discharge at 257.5 kWh (2026-02-14 15:24 expansion) between B1 (2025-11-16)
+ *   and B2 (2026-02-14).
+ * - For any other user / cloud-only fallback, computes generic LiFePO4 pack cycles & SOH from
+ *   bmsCycleCnt (when reported) or eDisChgAll / nominal pack energy (batCapacity * 48V).
  */
-export function calculateBatteryHealth(latestRow, liveData) {
-  const SOLO_DISCHARGE_KWH = 257.5;
-  const NOMINAL_MODULE_KWH = 2.4;
+export function calculateBatteryHealth(latestRow, liveData, status = null) {
   const RATED_CYCLES_TO_80_SOH = 6000;
-  const CALENDAR_AGING_PER_YEAR = 0.3;
+  const cycleLossPerCycle = 20 / RATED_CYCLES_TO_80_SOH;
+
+  const bmsCycleReported = parseInt(liveData?.bmsCycleCnt ?? latestRow?.bmsCycleCnt, 10) || 0;
+  const batParallel = String(liveData?.batParallelNum ?? status?.plant?.inverters?.[0]?.batParallelNum ?? '');
+  const batCapacityStr = String(liveData?.batCapacity ?? '');
+  const isOwnerDynessDual =
+    liveData?.source === 'dongle' ||
+    (!!status?.dongleEnabled &&
+      bmsCycleReported === 0 &&
+      batParallel === '2' &&
+      (!batCapacityStr || batCapacityStr === '100'));
+
+  if (isOwnerDynessDual) {
+    const SOLO_DISCHARGE_KWH = 257.5;
+    const NOMINAL_MODULE_KWH = 2.4;
+    const CALENDAR_AGING_PER_YEAR = 0.3;
+
+    const parsedDisChg = parseFloat(liveData?.eDisChgAll ?? latestRow?.eDisChgAll);
+    const parsedChg = parseFloat(liveData?.eChgAll ?? latestRow?.eChgAll);
+    const totalDisChgKwh = Number.isFinite(parsedDisChg) && parsedDisChg > 0 ? parsedDisChg : 573.0;
+    const totalChgKwh = Number.isFinite(parsedChg) && parsedChg > 0 ? parsedChg : 533.1;
+
+    const soloKwh = Math.min(totalDisChgKwh, SOLO_DISCHARGE_KWH);
+    const parallelKwh = Math.max(0, totalDisChgKwh - SOLO_DISCHARGE_KWH);
+
+    const bat1Kwh = soloKwh + parallelKwh / 2;
+    const bat2Kwh = parallelKwh / 2;
+
+    const bat1Cycles = Math.round(bat1Kwh / NOMINAL_MODULE_KWH);
+    const bat2Cycles = Math.round(bat2Kwh / NOMINAL_MODULE_KWH);
+    const avgCycles = Math.round((bat1Cycles + bat2Cycles) / 2);
+
+    const refTimeStr = liveData?.deviceTime || latestRow?.time;
+    const parsedRefMs = refTimeStr ? new Date(String(refTimeStr).replace(/-/g, '/')).getTime() : Date.now();
+    const refMs = Number.isFinite(parsedRefMs) ? parsedRefMs : Date.now();
+
+    const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000;
+    const b1StartMs = new Date('2025/11/16 00:00:00').getTime();
+    const b2StartMs = new Date('2026/02/14 15:24:00').getTime();
+
+    const b1Years = Math.max(0, (refMs - b1StartMs) / MS_PER_YEAR);
+    const b2Years = Math.max(0, (refMs - b2StartMs) / MS_PER_YEAR);
+
+    const bat1SohNum = Math.max(0, Math.min(100, 100 - bat1Cycles * cycleLossPerCycle - b1Years * CALENDAR_AGING_PER_YEAR));
+    const bat2SohNum = Math.max(0, Math.min(100, 100 - bat2Cycles * cycleLossPerCycle - b2Years * CALENDAR_AGING_PER_YEAR));
+    const avgSohNum = (bat1SohNum + bat2SohNum) / 2;
+
+    return {
+      isSplitModules: true,
+      model: '2× Dyness B4850',
+      bat1Cycles,
+      bat2Cycles,
+      avgCycles,
+      bat1Soh: bat1SohNum.toFixed(1),
+      bat2Soh: bat2SohNum.toFixed(1),
+      avgSoh: avgSohNum.toFixed(1),
+      bat1Kwh: Number(bat1Kwh.toFixed(1)),
+      bat2Kwh: Number(bat2Kwh.toFixed(1)),
+      totalDisChgKwh: Number(totalDisChgKwh.toFixed(1)),
+      totalChgKwh: Number(totalChgKwh.toFixed(1)),
+    };
+  }
+
+  const capacityAh = parseFloat(liveData?.batCapacity) || 100;
+  const parallelNum = parseInt(batParallel, 10) || 1;
+  const packKwh = (capacityAh * 48) / 1000;
 
   const parsedDisChg = parseFloat(liveData?.eDisChgAll ?? latestRow?.eDisChgAll);
   const parsedChg = parseFloat(liveData?.eChgAll ?? latestRow?.eChgAll);
-  const totalDisChgKwh = Number.isFinite(parsedDisChg) && parsedDisChg > 0 ? parsedDisChg : 573.0;
-  const totalChgKwh = Number.isFinite(parsedChg) && parsedChg > 0 ? parsedChg : 533.1;
+  const totalDisChgKwh = Number.isFinite(parsedDisChg) && parsedDisChg > 0 ? parsedDisChg : 0;
+  const totalChgKwh = Number.isFinite(parsedChg) && parsedChg > 0 ? parsedChg : 0;
 
-  const soloKwh = Math.min(totalDisChgKwh, SOLO_DISCHARGE_KWH);
-  const parallelKwh = Math.max(0, totalDisChgKwh - SOLO_DISCHARGE_KWH);
-
-  const bat1Kwh = soloKwh + parallelKwh / 2;
-  const bat2Kwh = parallelKwh / 2;
-
-  const bat1Cycles = Math.round(bat1Kwh / NOMINAL_MODULE_KWH);
-  const bat2Cycles = Math.round(bat2Kwh / NOMINAL_MODULE_KWH);
-  const avgCycles = Math.round((bat1Cycles + bat2Cycles) / 2);
-
-  const refTimeStr = liveData?.deviceTime || latestRow?.time;
-  const parsedRefMs = refTimeStr ? new Date(String(refTimeStr).replace(/-/g, '/')).getTime() : Date.now();
-  const refMs = Number.isFinite(parsedRefMs) ? parsedRefMs : Date.now();
-
-  const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000;
-  const b1StartMs = new Date('2025/11/16 00:00:00').getTime();
-  const b2StartMs = new Date('2026/02/14 15:24:00').getTime();
-
-  const b1Years = Math.max(0, (refMs - b1StartMs) / MS_PER_YEAR);
-  const b2Years = Math.max(0, (refMs - b2StartMs) / MS_PER_YEAR);
-
-  const cycleLossPerCycle = 20 / RATED_CYCLES_TO_80_SOH;
-  const bat1SohNum = Math.max(0, Math.min(100, 100 - bat1Cycles * cycleLossPerCycle - b1Years * CALENDAR_AGING_PER_YEAR));
-  const bat2SohNum = Math.max(0, Math.min(100, 100 - bat2Cycles * cycleLossPerCycle - b2Years * CALENDAR_AGING_PER_YEAR));
-  const avgSohNum = (bat1SohNum + bat2SohNum) / 2;
+  const avgCycles = bmsCycleReported > 0
+    ? bmsCycleReported
+    : (packKwh > 0 ? Math.round(totalDisChgKwh / packKwh) : 0);
+  const sohNum = Math.max(0, Math.min(100, 100 - avgCycles * cycleLossPerCycle));
 
   return {
-    model: '2× Dyness B4850',
-    bat1Cycles,
-    bat2Cycles,
+    isSplitModules: false,
+    model: parallelNum > 1 ? `${parallelNum}× LiFePO4 (${capacityAh}Ah)` : `LiFePO4 (${capacityAh}Ah)`,
+    bat1Cycles: avgCycles,
+    bat2Cycles: 0,
     avgCycles,
-    bat1Soh: bat1SohNum.toFixed(1),
-    bat2Soh: bat2SohNum.toFixed(1),
-    avgSoh: avgSohNum.toFixed(1),
-    bat1Kwh: Number(bat1Kwh.toFixed(1)),
-    bat2Kwh: Number(bat2Kwh.toFixed(1)),
+    bat1Soh: sohNum.toFixed(1),
+    bat2Soh: sohNum.toFixed(1),
+    avgSoh: sohNum.toFixed(1),
+    bat1Kwh: Number(totalDisChgKwh.toFixed(1)),
+    bat2Kwh: 0,
     totalDisChgKwh: Number(totalDisChgKwh.toFixed(1)),
     totalChgKwh: Number(totalChgKwh.toFixed(1)),
   };

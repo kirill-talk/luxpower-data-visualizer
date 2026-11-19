@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Lock, User, Key, Server, CheckCircle2, AlertCircle, LogOut, Globe } from 'lucide-react';
 import { translations } from '../utils/i18n';
-import { getApiBaseUrl, setCustomApiUrl } from '../utils/config';
+import { getApiBaseUrl, setCustomApiUrl, apiFetch } from '../utils/config';
 
 /**
  * AuthModal
@@ -54,37 +54,16 @@ export default function AuthModal({
     try {
       // Save custom API Proxy URL if specified
       setCustomApiUrl(apiUrl);
-      const endpointBase = getApiBaseUrl();
 
-      let res;
-      try {
-        res = await fetch(`${endpointBase}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            account: account.trim(),
-            password: password.trim(),
-            server: server.trim()
-          }),
-        });
-      } catch (fetchErr) {
-        // If primary Cloudflare Worker fetch fails (DNS/blocked/CORS), try fallback API if configured
-        const fallbackBase = import.meta.env.VITE_FALLBACK_API_URL || import.meta.env.VITE_API_BASE_URL || '/api';
-        if (fallbackBase && endpointBase !== fallbackBase) {
-          console.warn(`Primary proxy (${endpointBase}) failed, trying fallback (${fallbackBase}):`, fetchErr);
-          res = await fetch(`${fallbackBase}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              account: account.trim(),
-              password: password.trim(),
-              server: server.trim()
-            }),
-          });
-        } else {
-          throw fetchErr;
-        }
-      }
+      const res = await apiFetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account: account.trim(),
+          password: password.trim(),
+          server: server.trim()
+        }),
+      });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || (lang === 'en' ? 'Login failed' : 'Помилка авторизації'));
@@ -94,6 +73,7 @@ export default function AuthModal({
         account: data.account,
         cookie: data.cookie,
         defaultSerial: data.defaultSerial,
+        server: server.trim(),
         apiUrl: apiUrl.trim(),
         remember
       });
