@@ -13,6 +13,7 @@ import {
   Coins
 } from 'lucide-react';
 import { translations } from '../utils/i18n';
+import { formatDateHuman, formatShortDateHuman } from '../utils/dateFormat';
 
 /**
  * PeriodOverview
@@ -67,15 +68,8 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
 
     const isDarkMode = document.documentElement.classList.contains('dark');
 
-    // Dates formatted for X axis
-    const dates = dailyList.map(d => {
-      // e.g. "2026-11-17" -> "17.11"
-      const parts = d.date.split('-');
-      if (parts.length === 3) {
-        return `${parts[2]}.${parts[1]}`;
-      }
-      return d.date;
-    });
+    // Dates formatted for X axis (e.g. "19 лис" or "19 Nov")
+    const dates = dailyList.map((d) => formatShortDateHuman(d.date, lang));
 
     const gridData = dailyList.map(d => d.gridImportKwh);
     const batDischargeData = dailyList.map(d => d.batteryDischargeKwh);
@@ -101,9 +95,12 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
         },
         formatter: (params) => {
           if (!params || !params.length) return '';
+          const idx = params[0].dataIndex;
+          const rawItem = dailyList[idx];
+          const headerDate = rawItem?.date ? formatDateHuman(rawItem.date, lang) : params[0].axisValue;
           let tip = `<div style="font-weight:600;margin-bottom:6px;border-bottom:1px solid ${
             isDarkMode ? '#334155' : '#e2e8f0'
-          };padding-bottom:3px;">${params[0].axisValue}</div>`;
+          };padding-bottom:3px;">${headerDate}</div>`;
           params.forEach((p) => {
             tip += `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:3px;">
               <span style="display:flex;align-items:center;gap:6px;">

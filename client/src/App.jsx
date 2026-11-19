@@ -1,26 +1,17 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Sun,
-  Battery,
-  Zap,
-  Home,
   RefreshCw,
-  Calendar,
   Activity,
-  Table as TableIcon,
-  CheckCircle2,
   Clock,
-  Gauge,
   Cpu,
   Flame,
-  Layers,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
-  TrendingDown,
-  Thermometer,
   Moon,
-  LineChart,
+  Sun,
+  Home,
+  Battery,
+  Zap,
   Bolt,
   Info,
   Menu,
@@ -43,9 +34,16 @@ import MobileRecentLog from './components/mobile/MobileRecentLog';
 import MobilePowerFlowDiagram from './components/mobile/MobilePowerFlowDiagram';
 import AuthModal from './components/AuthModal';
 import PeriodOverview from './components/PeriodOverview';
+import DatePicker from './components/DatePicker';
 import { getCachedDayChart, setCachedDayChart, runWithConcurrency, isPastDate, cleanupLegacyLocalStorage } from './utils/telemetryCache';
 import { translations } from './utils/i18n';
-import { API_BASE_URL, apiFetch } from './utils/config';
+import { apiFetch } from './utils/config';
+import {
+  parseLocalDate,
+  toDateStr,
+  getTodayLocalDate,
+  formatDateHuman,
+} from './utils/dateFormat';
 import {
   parseInverterPoint,
   integrateEnergy,
@@ -68,43 +66,34 @@ function formatTimeWithoutSeconds(timeStr) {
   return t;
 }
 
-// Get today's local date as YYYY-MM-DD
-function getTodayLocalDate() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-// Generate an array of YYYY-MM-DD date strings between start and end (inclusive, chronological)
+// Generate an array of YYYY-MM-DD date strings between start and end (inclusive, chronological) in local time
 function getDateRangeArray(startDateStr, endDateStr) {
   const dates = [];
-  const curr = new Date(startDateStr);
-  const end = new Date(endDateStr);
-  const pad = (n) => String(n).padStart(2, '0');
+  const curr = parseLocalDate(startDateStr);
+  const end = parseLocalDate(endDateStr);
+  if (!curr || !end) return dates;
 
   while (curr <= end) {
-    dates.push(`${curr.getFullYear()}-${pad(curr.getMonth() + 1)}-${pad(curr.getDate())}`);
+    dates.push(toDateStr(curr));
     curr.setDate(curr.getDate() + 1);
   }
   return dates;
 }
 
-// Helper to compute start date given period mode and anchor date
-function calculatePeriodDates(mode, anchorDateStr) {
-  const [y, m, d] = anchorDateStr.split('-').map(Number);
-  const anchor = new Date(y, m - 1, d);
-  const pad = (n) => String(n).padStart(2, '0');
-  const toStr = (dateObj) => `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}`;
+// Compute period range anchored to today for 7d (1w) and current month (1m)
+function calculatePeriodDates(mode) {
+  const todayStr = getTodayLocalDate();
+  const todayObj = parseLocalDate(todayStr) || new Date();
 
   if (mode === '7d') {
-    const start = new Date(anchor);
+    const start = new Date(todayObj);
     start.setDate(start.getDate() - 6);
-    return { start: toStr(start), end: anchorDateStr };
+    return { start: toDateStr(start), end: todayStr };
   } else if (mode === 'month') {
-    const start = new Date(y, m - 1, 1);
-    return { start: toStr(start), end: anchorDateStr };
+    const start = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1);
+    return { start: toDateStr(start), end: todayStr };
   }
-  return { start: anchorDateStr, end: anchorDateStr };
+  return { start: todayStr, end: todayStr };
 }
 
 export default function App() {
@@ -113,20 +102,17 @@ export default function App() {
   const [chartData, setChartData] = useState([]);
   const [tableRows, setTableRows] = useState([]);
   const [selectedDate, setSelectedDate] = useState(getTodayLocalDate);
-  const [periodMode, setPeriodMode] = useState('1d'); // '1d' | '3d' | '7d' | '14d' | '30d' | 'month' | 'custom'
+  const [periodMode, setPeriodMode] = useState('1d'); // '1d' | '7d' | 'month' | 'custom'
   const [customRange, setCustomRange] = useState(() => {
     const today = getTodayLocalDate();
-    const d = new Date();
+    const d = parseLocalDate(today) || new Date();
     d.setDate(d.getDate() - 6);
-    const pad = (n) => String(n).padStart(2, '0');
     return {
-      start: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      start: toDateStr(d),
       end: today,
     };
   });
   const [periodStats, setPeriodStats] = useState(null);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [countdown, setCountdown] = useState(360);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
 
@@ -169,8 +155,6 @@ export default function App() {
   const [batteryRangeRows, setBatteryRangeRows] = useState(null);
   // Selected range data for Grid/Temp chart
   const [gridRangeRows, setGridRangeRows] = useState(null);
-
-  const countdownTimerRef = useRef(null);
 
   useEffect(() => {
     const htmlEl = document.documentElement;
@@ -275,7 +259,7 @@ export default function App() {
       }
       const data = await res.json();
       setLiveData(data);
-      setLastUpdated(new Date().toLocaleTimeString());
+      setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }));
     } catch (err) {
       console.error('Live fetch error:', err);
     }
@@ -318,7 +302,7 @@ export default function App() {
         setBatteryRangeRows([]);
         setGridRangeRows([]);
       }
-      setLastUpdated(new Date().toLocaleTimeString());
+      setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }));
     } catch (err) {
       console.error('History fetch error:', err);
     } finally {
@@ -436,7 +420,7 @@ export default function App() {
         dailyList: results,
       });
 
-      setLastUpdated(new Date().toLocaleTimeString());
+      setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }));
     } catch (err) {
       console.error('Period history fetch error:', err);
     } finally {
@@ -450,137 +434,52 @@ export default function App() {
     fetchLive();
   }, []);
 
+  // Always keep single-day chartData, tableRows & rangePoints in sync with selectedDate
   useEffect(() => {
-    if (periodMode === '1d') {
-      fetchHistory(selectedDate);
-    } else if (periodMode === 'custom') {
+    fetchHistory(selectedDate);
+  }, [selectedDate]);
+
+  // Fetch multi-day period history whenever multi-day mode or custom range changes
+  useEffect(() => {
+    if (periodMode === 'custom') {
       if (customRange?.start && customRange?.end) {
         const dates = getDateRangeArray(customRange.start, customRange.end);
         fetchPeriodHistory(dates);
       }
-    } else {
-      const { start, end } = calculatePeriodDates(periodMode, selectedDate);
+    } else if (periodMode === '7d' || periodMode === 'month') {
+      const { start, end } = calculatePeriodDates(periodMode);
       const dates = getDateRangeArray(start, end);
       fetchPeriodHistory(dates);
     }
-  }, [selectedDate, periodMode, customRange?.start, customRange?.end]);
-
-  // 6-minute (360s) Auto-refresh timer with timestamp tracking
-  // Tracks elapsed wall-clock time so background tab throttling doesn't stall refresh
-  const targetRefreshTimeRef = useRef(Date.now() + 360 * 1000);
-
-  // Sync target time when countdown is reset manually
-  const resetCountdownTimer = (seconds = 360) => {
-    targetRefreshTimeRef.current = Date.now() + seconds * 1000;
-    setCountdown(seconds);
-  };
+  }, [periodMode, customRange?.start, customRange?.end]);
 
   const handleManualRefresh = () => {
-    resetCountdownTimer(360);
+    fetchStatus();
     fetchLive();
-    if (periodMode === '1d') {
-      fetchHistory(selectedDate);
-    } else if (periodMode === 'custom') {
+    fetchHistory(selectedDate);
+    if (periodMode === 'custom') {
       if (customRange?.start && customRange?.end) {
         const dates = getDateRangeArray(customRange.start, customRange.end);
         fetchPeriodHistory(dates);
       }
-    } else {
-      const { start, end } = calculatePeriodDates(periodMode, selectedDate);
+    } else if (periodMode === '7d' || periodMode === 'month') {
+      const { start, end } = calculatePeriodDates(periodMode);
       const dates = getDateRangeArray(start, end);
       fetchPeriodHistory(dates);
     }
   };
-
-  // Keep latest ref so timer interval doesn't need to re-bind or recreate
-  const refreshFnRef = useRef(handleManualRefresh);
-  refreshFnRef.current = handleManualRefresh;
-
-  useEffect(() => {
-    if (!autoRefresh) {
-      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
-      return;
-    }
-
-    targetRefreshTimeRef.current = Date.now() + countdown * 1000;
-
-    countdownTimerRef.current = setInterval(() => {
-      const now = Date.now();
-      const remainingSec = Math.max(0, Math.round((targetRefreshTimeRef.current - now) / 1000));
-
-      if (remainingSec <= 0) {
-        targetRefreshTimeRef.current = Date.now() + 360 * 1000;
-        setCountdown(360);
-        if (refreshFnRef.current) refreshFnRef.current();
-      } else {
-        setCountdown(remainingSec);
-      }
-    }, 1000);
-
-    // Also listen to visibilitychange: when user returns to tab after it was throttled in background
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && autoRefresh) {
-        const now = Date.now();
-        const remainingSec = Math.max(0, Math.round((targetRefreshTimeRef.current - now) / 1000));
-        if (remainingSec <= 0) {
-          targetRefreshTimeRef.current = Date.now() + 360 * 1000;
-          setCountdown(360);
-          if (refreshFnRef.current) refreshFnRef.current();
-        } else {
-          setCountdown(remainingSec);
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [autoRefresh]);
-
-  // 15-second live polling for real-time dongle / inverter telemetry
-  const fetchLiveRef = useRef(fetchLive);
-  fetchLiveRef.current = fetchLive;
-
-  useEffect(() => {
-    if (!autoRefresh) return;
-
-    const liveInterval = setInterval(() => {
-      if (document.visibilityState === 'visible' && fetchLiveRef.current) {
-        fetchLiveRef.current();
-      }
-    }, 15000);
-
-    const onVisible = () => {
-      if (document.visibilityState === 'visible' && fetchLiveRef.current) {
-        fetchLiveRef.current();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisible);
-
-    return () => {
-      clearInterval(liveInterval);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, [autoRefresh]);
 
   // Day navigation handlers
   const handlePrevDay = () => {
-    const [y, m, d] = selectedDate.split('-').map(Number);
-    const dateObj = new Date(y, m - 1, d);
+    const dateObj = parseLocalDate(selectedDate) || new Date();
     dateObj.setDate(dateObj.getDate() - 1);
-    const pad = (n) => String(n).padStart(2, '0');
-    setSelectedDate(`${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}`);
+    setSelectedDate(toDateStr(dateObj));
   };
 
   const handleNextDay = () => {
-    const [y, m, d] = selectedDate.split('-').map(Number);
-    const dateObj = new Date(y, m - 1, d);
+    const dateObj = parseLocalDate(selectedDate) || new Date();
     dateObj.setDate(dateObj.getDate() + 1);
-    const pad = (n) => String(n).padStart(2, '0');
-    setSelectedDate(`${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}`);
+    setSelectedDate(toDateStr(dateObj));
   };
 
   // Metrics extraction & normalization
@@ -628,12 +527,35 @@ export default function App() {
     return 0;
   }, [liveData, latestRow]);
 
+  // Solar PV power and string voltages
+  const solarPower = useMemo(() => {
+    if (liveData?.ppv !== undefined) return Math.max(0, Math.round(Number(liveData.ppv) || 0));
+    if (latestRow?.ppv !== undefined) return Math.max(0, Math.round(Number(latestRow.ppv) || 0));
+    return 0;
+  }, [liveData, latestRow]);
+
+  const pv1Voltage = useMemo(() => {
+    if (liveData?.vpv1 !== undefined) return (Number(liveData.vpv1) / 10).toFixed(1);
+    if (latestRow?.vpv1 !== undefined) return (Number(latestRow.vpv1) || 0).toFixed(1);
+    return '0.0';
+  }, [liveData, latestRow]);
+
+  const pv2Voltage = useMemo(() => {
+    if (liveData?.vpv2 !== undefined) return (Number(liveData.vpv2) / 10).toFixed(1);
+    if (latestRow?.vpv2 !== undefined) return (Number(latestRow.vpv2) || 0).toFixed(1);
+    return '0.0';
+  }, [liveData, latestRow]);
+
   // Inverter Self-Consumption (Losses) in real time
   const currentInverterLoss = useMemo(() => {
-    const input = gridImport + battDischarge;
+    const input = gridImport + solarPower + battDischarge;
     const output = homeLoad + battCharge;
     return Math.max(0, Math.round(input - output));
-  }, [gridImport, battDischarge, homeLoad, battCharge]);
+  }, [gridImport, solarPower, battDischarge, homeLoad, battCharge]);
+
+  // Dynamic inverter load percentage relative to rated capacity
+  const ratedPowerW = (Number(status?.plant?.inverters?.[0]?.powerRating) || 6) * 1000;
+  const loadPercent = ((homeLoad / ratedPowerW) * 100).toFixed(1);
 
   // Counters (prefer real-time dongle values in liveData when present, else latestRow)
   const dailyGridImport = liveData?.eToUserDay ?? latestRow?.eToUserDay ?? '0';
@@ -644,7 +566,7 @@ export default function App() {
   const liveInverterTemp = liveData?.tinner ?? latestRow?.tinner;
   const liveBatteryVoltage = liveData?.vBat
     ? (Number(liveData.vBat) / 10).toFixed(1)
-    : (latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : '50.1');
+    : (latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : '0.0');
 
   // Power source durations (battery vs grid streak, estimated remaining runtime and 24h totals)
   const powerSourceDurations = useMemo(() => {
@@ -817,6 +739,9 @@ export default function App() {
                     key={item.id}
                     onClick={() => {
                       setActiveTab(item.id);
+                      if (item.id === 'consumption' && periodMode !== 'custom') {
+                        setSelectedDate(getTodayLocalDate());
+                      }
                       setSidebarOpen(false);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
@@ -857,23 +782,20 @@ export default function App() {
       {/* TOP APP HEADER & MAIN CONTENT WRAPPER */}
       <div className="lg:pl-64">
         {/* TOP HEADER */}
-        <header className="fixed top-0 left-0 lg:left-64 right-0 min-h-16 bg-white/85 dark:bg-[#0a0e17]/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08] z-40 px-3 sm:px-6 py-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 transition-colors duration-200">
+        <header className="fixed top-0 left-0 lg:left-64 right-0 min-h-16 bg-white/85 dark:bg-[#0a0e17]/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08] z-40 px-3 sm:px-6 py-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 transition-colors duration-200">
           {/* Identity & Status */}
-          <div className="flex items-center justify-between sm:justify-start gap-3">
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-1.5 -ml-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.05]"
+                className="lg:hidden p-1.5 -ml-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.05] shrink-0"
                 aria-label="Open menu"
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                    Luxpower Monitor
-                  </h1>
-                  <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border shadow-[0_0_10px_rgba(16,185,129,0.15)] ${
+              <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border shadow-[0_0_10px_rgba(16,185,129,0.15)] whitespace-nowrap ${
                     gridEpsInfo.isGridOnline
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
                       : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
@@ -885,7 +807,7 @@ export default function App() {
                   </div>
                   {dataSource && (
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-mono font-semibold ${
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-mono font-semibold whitespace-nowrap ${
                         dataSource === 'dongle'
                           ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400'
                           : 'bg-slate-100 dark:bg-white/[0.06] border-slate-200 dark:border-white/[0.1] text-slate-500 dark:text-slate-400'
@@ -894,15 +816,15 @@ export default function App() {
                         ? (lang === 'en' ? 'Live telemetry directly from LAN Wi-Fi dongle (Read-Only)' : 'Жива телеметрія напряму з LAN-донгла (Read-Only)')
                         : (lang === 'en' ? 'Telemetry from Luxpower Cloud' : 'Телеметрія з хмари Luxpower')}
                     >
-                      <Radio className="w-2.5 h-2.5" />
+                      <Radio className="w-2.5 h-2.5 shrink-0" />
                       <span>{dataSource === 'dongle' ? 'LAN Dongle' : 'Cloud'}</span>
                     </span>
                   )}
                 </div>
                 <div className="text-[10px] sm:text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 truncate">
-                  <span>SN: <strong className="font-semibold text-slate-700 dark:text-slate-200">{customAuth?.defaultSerial || status?.defaultSerial || liveData?.serialNum || '—'}</strong></span>
-                  <span className="text-slate-300 dark:text-slate-600">•</span>
-                  <span>SNA 6K</span>
+                  <span className="truncate">SN: <strong className="font-semibold text-slate-700 dark:text-slate-200">{customAuth?.defaultSerial || status?.defaultSerial || liveData?.serialNum || '—'}</strong></span>
+                  <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
+                  <span className="shrink-0">SNA 6K</span>
                   {lastUpdated && (
                     <>
                       <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">•</span>
@@ -914,7 +836,7 @@ export default function App() {
             </div>
 
             {/* Mobile-only controls: Auth, Language toggle and theme toggle */}
-            <div className="sm:hidden flex items-center gap-1.5">
+            <div className="sm:hidden flex items-center gap-1 shrink-0">
               <button
                 onClick={() => setAuthModalOpen(true)}
                 className={`flex items-center justify-center w-8 h-8 rounded-lg border transition-all shadow-sm ${
@@ -928,7 +850,7 @@ export default function App() {
               </button>
               <button
                 onClick={toggleLang}
-                className="flex items-center justify-center px-2 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 font-mono text-xs font-bold transition-all shadow-sm"
+                className="flex items-center justify-center min-w-[32px] px-1.5 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 font-mono text-xs font-bold transition-all shadow-sm"
                 title={t.toggleLang}
               >
                 {lang === 'en' ? 'UA' : 'EN'}
@@ -943,10 +865,10 @@ export default function App() {
             </div>
           </div>
 
-          {/* Controls: Date, Refresh, Auto, Language, Theme Toggle */}
-          <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
-            {/* Date Navigator: Only single-day calendar picker in header */}
-            <div className="inline-flex items-center rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] p-0.5 shadow-sm">
+          {/* Controls: Date, Refresh, Auth, Language, Theme Toggle */}
+          <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2 min-w-0">
+            {/* Date Navigator: Custom Monday-first calendar picker in header */}
+            <div className="inline-flex items-center rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] p-0.5 shadow-sm shrink-0">
               <button
                 onClick={handlePrevDay}
                 className="w-7 h-7 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/[0.08] rounded-md transition-all"
@@ -954,15 +876,12 @@ export default function App() {
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <div className="flex items-center gap-1 px-1.5 text-[11px] font-mono font-medium text-slate-700 dark:text-slate-200">
-                <Calendar className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer text-xs w-[96px] [color-scheme:light] dark:[color-scheme:dark]"
-                />
-              </div>
+              <DatePicker
+                value={selectedDate}
+                onChange={setSelectedDate}
+                lang={lang}
+                buttonClassName="px-1.5 py-1 text-[11px] sm:text-xs"
+              />
               <button
                 onClick={handleNextDay}
                 className="w-7 h-7 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/[0.08] rounded-md transition-all"
@@ -976,33 +895,17 @@ export default function App() {
             <button
               onClick={handleManualRefresh}
               disabled={loading}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/[0.08] transition-all shadow-sm text-xs font-medium"
+              className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/[0.08] transition-all shadow-sm text-xs font-medium shrink-0"
               title={t.refresh}
             >
               <RefreshCw className={`w-3.5 h-3.5 text-emerald-500 ${loading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{t.refresh}</span>
-            </button>
-
-            {/* Auto refresh badge */}
-            <button
-              onClick={() => {
-                const next = !autoRefresh;
-                setAutoRefresh(next);
-                if (next) resetCountdownTimer(360);
-              }}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] hover:border-cyan-500/40 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/[0.08] transition-all shadow-sm text-xs font-medium"
-              title={t.autoMin}
-            >
-              <Clock className="w-3.5 h-3.5 text-cyan-500" />
-              <span className="font-mono text-cyan-600 dark:text-cyan-400 font-semibold text-xs">
-                {autoRefresh ? `${Math.floor(countdown / 60)}:${(countdown % 60).toString().padStart(2, '0')}` : t.off}
-              </span>
+              <span>{t.refresh}</span>
             </button>
 
             {/* Desktop Auth Button */}
             <button
               onClick={() => setAuthModalOpen(true)}
-              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg border text-xs font-mono font-semibold transition-all shadow-sm ${
+              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg border text-xs font-mono font-semibold transition-all shadow-sm shrink-0 ${
                 status?.connected || customAuth
                   ? 'bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
                   : 'bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400 animate-pulse'
@@ -1025,7 +928,7 @@ export default function App() {
             {/* Desktop Language Switcher */}
             <button
               onClick={toggleLang}
-              className="hidden sm:flex items-center justify-center px-2.5 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/[0.1] font-mono text-xs font-bold transition-all shadow-sm"
+              className="hidden sm:flex items-center justify-center px-2.5 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/[0.1] font-mono text-xs font-bold transition-all shadow-sm shrink-0"
               title={t.toggleLang}
             >
               {lang === 'en' ? 'UA' : 'EN'}
@@ -1034,7 +937,7 @@ export default function App() {
             {/* Desktop Theme Toggle Button */}
             <button
               onClick={toggleTheme}
-              className="hidden sm:flex relative items-center justify-center w-8 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-slate-600 dark:text-amber-400 hover:bg-white dark:hover:bg-white/[0.1] transition-all shadow-sm"
+              className="hidden sm:flex relative items-center justify-center w-8 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-slate-600 dark:text-amber-400 hover:bg-white dark:hover:bg-white/[0.1] transition-all shadow-sm shrink-0"
               title={t.changeTheme}
             >
               {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
@@ -1043,7 +946,7 @@ export default function App() {
         </header>
 
         {/* MAIN CONTENT AREA */}
-        <main className="relative pt-28 sm:pt-20 min-h-screen px-3 sm:px-6 py-4 sm:py-6 pb-20 transition-colors duration-200">
+        <main className="relative pt-[112px] sm:pt-20 min-h-screen px-3 sm:px-6 py-4 sm:py-6 pb-20 transition-colors duration-200">
           <div className="flex flex-col gap-6 max-w-[1600px] mx-auto">
             {/* MOBILE ONLY (< xl / < 1200px): QUICK STATUS BAR, KPI & COMPACT POWER FLOW */}
             <div className="flex flex-col gap-4 xl:hidden">
@@ -1052,13 +955,6 @@ export default function App() {
                 lastUpdated={lastUpdated}
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
-                countdown={countdown}
-                autoRefresh={autoRefresh}
-                onToggleAutoRefresh={() => {
-                  const next = !autoRefresh;
-                  setAutoRefresh(next);
-                  if (next) resetCountdownTimer(360);
-                }}
                 onRefresh={handleManualRefresh}
                 loading={loading}
                 isGridOnline={gridEpsInfo.isGridOnline}
@@ -1091,7 +987,9 @@ export default function App() {
 
               {/* Mobile-optimized Power Flow Diagram */}
               <MobilePowerFlowDiagram
-                solarPower={0}
+                solarPower={solarPower}
+                pv1Voltage={pv1Voltage}
+                pv2Voltage={pv2Voltage}
                 gridPower={gridImport}
                 homeLoad={homeLoad}
                 batteryPower={battCharge > 0 ? battCharge : (battDischarge > 0 ? -battDischarge : 0)}
@@ -1101,11 +999,11 @@ export default function App() {
                 gridFrequency={gridEpsInfo.frequency}
                 isGridOnline={gridEpsInfo.isGridOnline}
                 isEpsActive={!gridEpsInfo.isGridOnline}
-                inverterTemp={liveInverterTemp ?? '28.0'}
+                inverterTemp={liveInverterTemp ?? '--'}
                 batteryVoltage={liveBatteryVoltage}
                 batteryCurrent={batteryCurrent}
                 batteryHealth={batteryHealth}
-                loadPercent={latestRow?.loadPercent ?? '4.6'}
+                loadPercent={loadPercent}
                 lang={lang}
               />
 
@@ -1285,7 +1183,9 @@ export default function App() {
                 {/* Power Flow Diagram (Desktop) */}
                 <div id="power-flow" className="hidden xl:block">
                   <PowerFlowDiagram
-                    solarPower={0}
+                    solarPower={solarPower}
+                    pv1Voltage={pv1Voltage}
+                    pv2Voltage={pv2Voltage}
                     gridPower={gridImport}
                     homeLoad={homeLoad}
                     batteryPower={battCharge > 0 ? battCharge : (battDischarge > 0 ? -battDischarge : 0)}
@@ -1295,11 +1195,11 @@ export default function App() {
                     gridFrequency={gridEpsInfo.frequency}
                     isGridOnline={gridEpsInfo.isGridOnline}
                     isEpsActive={!gridEpsInfo.isGridOnline}
-                    inverterTemp={liveInverterTemp ?? '28.0'}
+                    inverterTemp={liveInverterTemp ?? '--'}
                     batteryVoltage={liveBatteryVoltage}
                     batteryCurrent={batteryCurrent}
                     batteryHealth={batteryHealth}
-                    loadPercent={latestRow?.loadPercent ?? '4.6'}
+                    loadPercent={loadPercent}
                     lang={lang}
                   />
                 </div>
@@ -1409,7 +1309,12 @@ export default function App() {
                     ].map((p) => (
                       <button
                         key={p.key}
-                        onClick={() => setPeriodMode(p.key)}
+                        onClick={() => {
+                          setPeriodMode(p.key);
+                          if (p.key !== 'custom') {
+                            setSelectedDate(getTodayLocalDate());
+                          }
+                        }}
                         className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
                           periodMode === p.key
                             ? 'bg-emerald-500 text-white shadow-sm font-semibold'
@@ -1423,33 +1328,37 @@ export default function App() {
 
                   {/* Range inputs: only shown if custom range is selected */}
                   {periodMode === 'custom' && (
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-xs font-mono">
-                      <Calendar className="w-4 h-4 text-amber-500 shrink-0" />
+                    <div className="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-xs font-mono">
                       <span className="text-slate-500 dark:text-slate-400 text-[11px]">{t.rangeFrom}:</span>
-                      <input
-                        type="date"
+                      <DatePicker
                         value={customRange?.start || ''}
-                        onChange={(e) => setCustomRange((prev) => ({ ...prev, start: e.target.value }))}
-                        className="bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer text-xs w-[96px] [color-scheme:light] dark:[color-scheme:dark]"
+                        onChange={(val) => setCustomRange((prev) => ({ ...prev, start: val }))}
+                        lang={lang}
                       />
                       <span className="text-slate-400">-</span>
                       <span className="text-slate-500 dark:text-slate-400 text-[11px]">{t.rangeTo}:</span>
-                      <input
-                        type="date"
+                      <DatePicker
                         value={customRange?.end || ''}
-                        onChange={(e) => setCustomRange((prev) => ({ ...prev, end: e.target.value }))}
-                        className="bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer text-xs w-[96px] [color-scheme:light] dark:[color-scheme:dark]"
+                        onChange={(val) => setCustomRange((prev) => ({ ...prev, end: val }))}
+                        lang={lang}
                       />
                     </div>
                   )}
                 </div>
 
                 <section id="consumption-stats" className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between px-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                        {periodMode === '1d' ? `${t.periodOverview}: ${selectedDate}` : `${t.periodOverview} (${periodStats?.startDate || selectedDate} — ${periodStats?.endDate || selectedDate})`}
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                      <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                        {periodMode === '1d'
+                          ? `${t.periodOverview}: ${formatDateHuman(selectedDate, lang)}`
+                          : (() => {
+                              const range = periodMode === 'custom'
+                                ? { start: customRange?.start || selectedDate, end: customRange?.end || selectedDate }
+                                : calculatePeriodDates(periodMode);
+                              return `${t.periodOverview} (${formatDateHuman(range.start, lang)} — ${formatDateHuman(range.end, lang)})`;
+                            })()}
                       </h2>
                     </div>
                     {loading && (
@@ -1506,7 +1415,7 @@ export default function App() {
                           <Home className="w-4 h-4" />
                         </div>
                         <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                          {t.secPowerFlowTitle} ({selectedDate})
+                          {t.secPowerFlowTitle} ({formatDateHuman(selectedDate, lang)})
                         </h3>
                       </div>
                       <span className="text-xs font-mono text-slate-400">

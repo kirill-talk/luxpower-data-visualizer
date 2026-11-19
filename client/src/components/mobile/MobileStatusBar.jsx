@@ -1,40 +1,26 @@
 import React from 'react';
-import { Calendar, RefreshCw, Clock } from 'lucide-react';
+import { RefreshCw, Clock } from 'lucide-react';
 import { translations } from '../../utils/i18n';
+import DatePicker from '../DatePicker';
 
 /**
  * MobileStatusBar
- * Compact quick status bar placed at top of mobile screen:
+ * Compact quick status bar placed at top of mobile/tablet screens (< xl):
  * - Model & Serial Number
  * - Last update timestamp
- * - Period Selector & Date controls
- * - 6-min Countdown badge & quick refresh button
+ * - Custom Monday-first DatePicker & manual refresh button
  */
 export default function MobileStatusBar({
   serialNumber = '—',
   lastUpdated,
   selectedDate,
   onDateChange,
-  periodMode = '1d',
-  onPeriodChange,
-  customRange = { start: '', end: '' },
-  onCustomRangeChange,
-  countdown = 360,
-  autoRefresh = true,
-  onToggleAutoRefresh,
   onRefresh,
   loading = false,
   isGridOnline = true,
   lang = 'uk',
 }) {
   const t = translations[lang] || translations.uk;
-  const isEn = lang === 'en';
-
-  const formatCountdown = (sec) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
 
   return (
     <div className="flex flex-col gap-2.5 p-3 bg-white dark:bg-[#171b26] rounded-xl border border-slate-200/80 dark:border-white/[0.08] shadow-sm transition-colors">
@@ -63,39 +49,27 @@ export default function MobileStatusBar({
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-white/[0.05]">
+      <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100 dark:border-white/[0.05]">
         {/* Date Selector */}
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100 dark:bg-[#1c1f2a] text-slate-700 dark:text-slate-200 text-xs font-mono">
-          <Calendar className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-          <input
-            type="date"
+        <div className="flex items-center px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-[#1c1f2a] text-slate-700 dark:text-slate-200">
+          <DatePicker
             value={selectedDate}
-            onChange={(e) => onDateChange(e.target.value)}
-            className="bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer text-xs w-[96px] [color-scheme:light] dark:[color-scheme:dark]"
+            onChange={onDateChange}
+            lang={lang}
           />
         </div>
 
-        {/* Refresh & Countdown Controls */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={onToggleAutoRefresh}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-[#1c1f2a] text-slate-600 dark:text-slate-400 text-xs hover:bg-slate-200 dark:hover:bg-[#262a35] transition-colors"
-            title={t.autoMin}
-          >
-            <RefreshCw className={`w-3 h-3 text-emerald-500 ${loading ? 'animate-spin' : ''}`} />
-            <span className="font-mono text-[10px]">
-              {autoRefresh ? formatCountdown(countdown) : t.off}
-            </span>
-          </button>
-          <button
-            onClick={onRefresh}
-            disabled={loading}
-            aria-label={t.refresh}
-            className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-[#262a35] active:bg-emerald-500/20 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:text-emerald-500 transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-emerald-500 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+        {/* Manual Refresh Button */}
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={loading}
+          aria-label={t.refresh}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-[#262a35] active:bg-emerald-500/20 text-slate-700 dark:text-slate-200 hover:text-emerald-500 text-xs font-medium transition-colors"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-emerald-500 ${loading ? 'animate-spin' : ''}`} />
+          <span>{t.refresh}</span>
+        </button>
       </div>
     </div>
   );

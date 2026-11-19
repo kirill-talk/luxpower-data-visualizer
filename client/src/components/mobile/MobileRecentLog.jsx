@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronRight, FileText } from 'lucide-react';
 import { translations } from '../../utils/i18n';
+import { formatDateTimeHuman } from '../../utils/dateFormat';
 
 /**
  * MobileRecentLog
@@ -45,7 +46,7 @@ export default function MobileRecentLog({ latestRow, totalRows = 0, onShowAll, l
             </span>
           </div>
           <span className="font-mono text-[10px] text-slate-400">
-            {latestRow.time || latestRow.serverTime || '--'}
+            {formatDateTimeHuman(latestRow.time || latestRow.serverTime, lang)}
           </span>
         </div>
 

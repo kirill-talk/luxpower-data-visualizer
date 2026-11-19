@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Download, ChevronLeft, ChevronRight, Eye, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { translations } from '../utils/i18n';
+import { formatDateTimeHuman } from '../utils/dateFormat';
 
 export default function DataTable({ rows, lang = 'uk' }) {
   const t = translations[lang] || translations.uk;
@@ -118,7 +119,7 @@ export default function DataTable({ rows, lang = 'uk' }) {
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                     <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200 font-tabular">
-                      {r.time || t.time}
+                      {r.time ? formatDateTimeHuman(r.time, lang) : t.time}
                     </span>
                   </div>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-slate-200/60 dark:bg-white/[0.06] text-[10px] font-mono font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
@@ -203,7 +204,9 @@ export default function DataTable({ rows, lang = 'uk' }) {
                 <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-white/[0.04] transition">
                   {columns.map(c => (
                     <td key={c} className="p-2.5 whitespace-nowrap font-mono text-slate-600 dark:text-slate-400 font-tabular text-[11px]">
-                      {r[c] !== null && r[c] !== undefined ? String(r[c]) : '-'}
+                      {c === 'time' && r[c]
+                        ? formatDateTimeHuman(r[c], lang)
+                        : (r[c] !== null && r[c] !== undefined ? String(r[c]) : '-')}
                     </td>
                   ))}
                 </tr>

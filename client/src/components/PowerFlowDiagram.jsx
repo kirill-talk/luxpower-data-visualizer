@@ -12,6 +12,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { translations } from '../utils/i18n';
+import { formatDateHuman } from '../utils/dateFormat';
 
 /**
  * PowerFlowDiagram
@@ -26,20 +27,22 @@ import { translations } from '../utils/i18n';
  */
 export default function PowerFlowDiagram({
   solarPower = 0,
+  pv1Voltage = '0.0',
+  pv2Voltage = '0.0',
   gridPower = 0,
   homeLoad = 0,
   batteryPower = 0, // positive = charging, negative = discharging
   soc = 0,
   inverterLoss = 0,
-  gridVoltage = 220,
-  gridFrequency = 50,
+  gridVoltage = '0.0',
+  gridFrequency = '0.0',
   isGridOnline = true,
   isEpsActive = false,
-  inverterTemp = '28.0',
-  batteryVoltage = '50.1',
-  batteryCurrent = '20.1',
+  inverterTemp = '--',
+  batteryVoltage = '0.0',
+  batteryCurrent = '0.0',
   batteryHealth = null,
-  loadPercent = '4.6',
+  loadPercent = '0.0',
   lang = 'uk',
 }) {
   const t = translations[lang] || translations.uk;
@@ -63,8 +66,10 @@ export default function PowerFlowDiagram({
     totalDisChgKwh = 0,
   } = batteryHealth || {};
 
+  const b1DateLabel = formatDateHuman('2025-11-16', lang);
+  const b2DateLabel = formatDateHuman('2026-02-14', lang);
   const batteryTitleTooltip = isSplitModules
-    ? `B1 (11.2025): ${bat1Soh}% (${bat1Kwh} ${unitKwh})\nB2 (02.2026): ${bat2Soh}% (${bat2Kwh} ${unitKwh})`
+    ? `B1 (${b1DateLabel}): ${bat1Soh}% (${bat1Kwh} ${unitKwh})\nB2 (${b2DateLabel}): ${bat2Soh}% (${bat2Kwh} ${unitKwh})`
     : `${isEn ? 'Lifetime discharge' : 'Загальний розряд'}: ${totalDisChgKwh} ${unitKwh} (${avgCycles} ${isEn ? 'cycles' : 'циклів'})`;
 
   const isCharging = batteryPower > 0;
@@ -76,8 +81,18 @@ export default function PowerFlowDiagram({
   const isSolarFlowActive = solarPower > 10;
   const isBatteryFlowActive = absBattPower > 10;
 
-  // Real or clamped inverter loss
-  const effectiveLoss = inverterLoss > 0 ? inverterLoss : 113;
+  const effectiveLoss = Math.max(0, Number(inverterLoss) || 0);
+  const totalIn =
+    Math.max(0, Number(gridPower) || 0) +
+    Math.max(0, Number(solarPower) || 0) +
+    (isDischarging ? absBattPower : 0);
+  const totalOut =
+    Math.max(0, Number(homeLoad) || 0) +
+    (isCharging ? absBattPower : 0);
+  const efficiency =
+    totalIn > 0
+      ? `${Math.min(99.9, Math.max(0, (totalOut / totalIn) * 100)).toFixed(1)}%`
+      : '—';
 
   return (
     <section className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-3 sm:p-5 lg:p-6 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col gap-4 sm:gap-5 transition-all">
@@ -173,7 +188,7 @@ export default function PowerFlowDiagram({
                 </div>
                 {/* Secondary PV info hidden on mobile to avoid clutter */}
                 <div className="hidden sm:block text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
-                  PV1: 0 {unitV} • PV2: 0 {unitV}
+                  PV1: {pv1Voltage} {unitV} • PV2: {pv2Voltage} {unitV}
                 </div>
               </div>
             </div>
@@ -501,7 +516,7 @@ export default function PowerFlowDiagram({
                     <span>
                       {isEn ? 'Efficiency:' : 'Ефективність:'}{' '}
                       <strong className="text-purple-600 dark:text-purple-400 font-semibold">
-                        97.4%
+                        {efficiency}
                       </strong>
                     </span>
                     <span className="text-purple-600 dark:text-purple-400 font-semibold">
@@ -613,25 +628,13 @@ export default function PowerFlowDiagram({
               </div>
               <div className="flex flex-col flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <div
-                    className="relative group/batTitle min-w-0 cursor-help"
+                  <span
+                    className="block text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 truncate cursor-help"
                     title={batteryTitleTooltip}
                   >
-                    <span className="block text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 truncate">
-                      {isEn ? 'Battery' : 'Акумулятор'}
-                      <span className="hidden sm:inline"> ({batteryModel})</span>
-                    </span>
-                    <div className="pointer-events-none opacity-0 group-hover/batTitle:opacity-100 transition-opacity duration-150 absolute left-0 bottom-full mb-2 z-50 w-max max-w-xs rounded-lg bg-slate-900 dark:bg-slate-800 text-white border border-slate-700/80 shadow-xl px-2.5 py-1.5 text-[10px] font-mono leading-relaxed">
-                      {isSplitModules ? (
-                        <>
-                          <div>B1 (11.2025): {bat1Soh}% ({bat1Kwh} {unitKwh})</div>
-                          <div>B2 (02.2026): {bat2Soh}% ({bat2Kwh} {unitKwh})</div>
-                        </>
-                      ) : (
-                        <div>{isEn ? 'Lifetime discharge' : 'Загальний розряд'}: {totalDisChgKwh} {unitKwh}</div>
-                      )}
-                    </div>
-                  </div>
+                    {isEn ? 'Battery' : 'Акумулятор'}
+                    <span className="hidden sm:inline"> ({batteryModel})</span>
+                  </span>
                   <span className={`px-1.5 py-0.2 rounded text-[8px] sm:text-[9px] font-mono font-semibold border shrink-0 ${
                     isCharging
                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
@@ -668,8 +671,8 @@ export default function PowerFlowDiagram({
                     className="whitespace-nowrap cursor-help"
                     title={isSplitModules
                       ? (isEn
-                        ? `Avg: ${avgCycles} cycles • B1 (Nov 2025): ${bat1Kwh} kWh (${bat1Cycles} cyc) • B2 (Feb 2026): ${bat2Kwh} kWh (${bat2Cycles} cyc)`
-                        : `Сер.: ${avgCycles} циклів • B1 (11.2025): ${bat1Kwh} кВт·год (${bat1Cycles} ц.) • B2 (02.2026): ${bat2Kwh} кВт·год (${bat2Cycles} ц.)`)
+                        ? `Avg: ${avgCycles} cycles • B1 (${b1DateLabel}): ${bat1Kwh} kWh (${bat1Cycles} cyc) • B2 (${b2DateLabel}): ${bat2Kwh} kWh (${bat2Cycles} cyc)`
+                        : `Сер.: ${avgCycles} циклів • B1 (${b1DateLabel}): ${bat1Kwh} кВт·год (${bat1Cycles} ц.) • B2 (${b2DateLabel}): ${bat2Kwh} кВт·год (${bat2Cycles} ц.)`)
                       : `${avgCycles} ${isEn ? 'cycles' : 'циклів'}`}
                   >
                     {isSplitModules ? (

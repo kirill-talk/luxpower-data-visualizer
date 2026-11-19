@@ -12,6 +12,7 @@ import {
   Flame,
   Sun
 } from 'lucide-react';
+import { formatDateHuman } from '../../utils/dateFormat';
 
 /**
  * MobilePowerFlowDiagram
@@ -22,20 +23,22 @@ import {
  */
 export default function MobilePowerFlowDiagram({
   solarPower = 0,
+  pv1Voltage = '0.0',
+  pv2Voltage = '0.0',
   gridPower = 0,
   homeLoad = 0,
   batteryPower = 0,
   soc = '0',
   inverterLoss = 0,
-  gridVoltage = 220,
-  gridFrequency = 50,
+  gridVoltage = '0.0',
+  gridFrequency = '0.0',
   isGridOnline = true,
   isEpsActive = false,
-  inverterTemp = '28.0',
-  batteryVoltage = '50.1',
+  inverterTemp = '--',
+  batteryVoltage = '0.0',
   batteryCurrent = '0.0',
   batteryHealth = null,
-  loadPercent = '4.6',
+  loadPercent = '0.0',
   lang = 'uk'
 }) {
   const isEn = lang === 'en';
@@ -58,14 +61,27 @@ export default function MobilePowerFlowDiagram({
     totalDisChgKwh = 0,
   } = batteryHealth || {};
 
+  const b1DateLabel = formatDateHuman('2025-11-16', lang);
+  const b2DateLabel = formatDateHuman('2026-02-14', lang);
   const batteryTitleTooltip = isSplitModules
-    ? `B1 (11.2025): ${bat1Soh}% (${bat1Kwh} ${unitKwh})\nB2 (02.2026): ${bat2Soh}% (${bat2Kwh} ${unitKwh})`
+    ? `B1 (${b1DateLabel}): ${bat1Soh}% (${bat1Kwh} ${unitKwh})\nB2 (${b2DateLabel}): ${bat2Soh}% (${bat2Kwh} ${unitKwh})`
     : `${isEn ? 'Lifetime discharge' : 'Загальний розряд'}: ${totalDisChgKwh} ${unitKwh} (${avgCycles} ${isEn ? 'cycles' : 'циклів'})`;
 
   const isCharging = batteryPower > 0;
   const isDischarging = batteryPower < 0;
   const absBattPower = Math.abs(batteryPower);
-  const effectiveLoss = inverterLoss > 0 ? inverterLoss : Math.max(0, gridPower + (isDischarging ? absBattPower : 0) - homeLoad - (isCharging ? absBattPower : 0));
+  const effectiveLoss = Math.max(0, Number(inverterLoss) || 0);
+  const totalIn =
+    Math.max(0, Number(gridPower) || 0) +
+    Math.max(0, Number(solarPower) || 0) +
+    (isDischarging ? absBattPower : 0);
+  const totalOut =
+    Math.max(0, Number(homeLoad) || 0) +
+    (isCharging ? absBattPower : 0);
+  const efficiency =
+    totalIn > 0
+      ? `${Math.min(99.9, Math.max(0, (totalOut / totalIn) * 100)).toFixed(1)}%`
+      : '—';
 
   return (
     <section className="bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-4 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col gap-3 transition-all">
@@ -186,7 +202,7 @@ export default function MobilePowerFlowDiagram({
           <div className="flex flex-col items-end">
             <span className="text-[9px] font-mono uppercase text-slate-400">{isEn ? 'Efficiency' : 'ККД'}</span>
             <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
-              {gridPower > 0 ? `${Math.min(99, Math.max(70, Math.round(((homeLoad) / (gridPower)) * 100)))}%` : '96%'}
+              {efficiency}
             </span>
           </div>
         </div>
@@ -215,27 +231,15 @@ export default function MobilePowerFlowDiagram({
                 )}
               </div>
               <div className="flex flex-col">
-                <div
-                  className="relative group/batTitle cursor-help"
+                <span
+                  className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-help"
                   title={batteryTitleTooltip}
                 >
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    {isEn ? 'Battery' : 'Акумулятор'}{' '}
-                    <span className="font-mono text-[10px] font-semibold text-slate-400">
-                      ({batteryModel})
-                    </span>
+                  {isEn ? 'Battery' : 'Акумулятор'}{' '}
+                  <span className="font-mono text-[10px] font-semibold text-slate-400">
+                    ({batteryModel})
                   </span>
-                  <div className="pointer-events-none opacity-0 group-hover/batTitle:opacity-100 transition-opacity duration-150 absolute left-0 bottom-full mb-1.5 z-50 w-max max-w-xs rounded-lg bg-slate-900 dark:bg-slate-800 text-white border border-slate-700/80 shadow-xl px-2.5 py-1.5 text-[10px] font-mono leading-relaxed">
-                    {isSplitModules ? (
-                      <>
-                        <div>B1 (11.2025): {bat1Soh}% ({bat1Kwh} {unitKwh})</div>
-                        <div>B2 (02.2026): {bat2Soh}% ({bat2Kwh} {unitKwh})</div>
-                      </>
-                    ) : (
-                      <div>{isEn ? 'Lifetime discharge' : 'Загальний розряд'}: {totalDisChgKwh} {unitKwh}</div>
-                    )}
-                  </div>
-                </div>
+                </span>
                 <span className="text-[10px] font-mono text-slate-400">
                   {batteryVoltage} {unitV} • {isCharging ? `+${batteryCurrent}` : isDischarging ? `-${batteryCurrent}` : '0.0'} A
                 </span>

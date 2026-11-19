@@ -241,15 +241,15 @@ export function normalizeGridAndEps(liveData, latestRow) {
       fac = rowFac;
       isGridOnline = true;
     } else {
-      vac = rowVeps || 230;
-      fac = rowFeps || 50;
+      vac = rowVeps || 0;
+      fac = rowFeps || 0;
       isGridOnline = false;
     }
   }
 
   return {
-    voltage: vac > 0 ? vac.toFixed(1) : '230.0',
-    frequency: fac > 0 ? fac.toFixed(1) : '50.0',
+    voltage: vac > 0 ? vac.toFixed(1) : '0.0',
+    frequency: fac > 0 ? fac.toFixed(1) : '0.0',
     isGridOnline,
   };
 }
@@ -475,8 +475,8 @@ export function calculateBatteryHealth(latestRow, liveData, status = null) {
 
     const parsedDisChg = parseFloat(liveData?.eDisChgAll ?? latestRow?.eDisChgAll);
     const parsedChg = parseFloat(liveData?.eChgAll ?? latestRow?.eChgAll);
-    const totalDisChgKwh = Number.isFinite(parsedDisChg) && parsedDisChg > 0 ? parsedDisChg : 573.0;
-    const totalChgKwh = Number.isFinite(parsedChg) && parsedChg > 0 ? parsedChg : 533.1;
+    const totalDisChgKwh = Number.isFinite(parsedDisChg) && parsedDisChg > 0 ? parsedDisChg : 0;
+    const totalChgKwh = Number.isFinite(parsedChg) && parsedChg > 0 ? parsedChg : 0;
 
     const soloKwh = Math.min(totalDisChgKwh, SOLO_DISCHARGE_KWH);
     const parallelKwh = Math.max(0, totalDisChgKwh - SOLO_DISCHARGE_KWH);
