@@ -22,6 +22,7 @@ export default function DatePicker({
   showIcon = true,
   className = '',
   buttonClassName = '',
+  disabled = false,
 }) {
   const isEn = lang === 'en';
   const [open, setOpen] = useState(false);
@@ -64,6 +65,7 @@ export default function DatePicker({
   }, [open]);
 
   const handleToggleOpen = () => {
+    if (disabled) return;
     if (!open && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const popWidth = 272;
@@ -127,11 +129,16 @@ export default function DatePicker({
       <button
         type="button"
         onClick={handleToggleOpen}
-        className={`inline-flex items-center gap-1.5 text-xs font-mono font-medium text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white focus:outline-none whitespace-nowrap cursor-pointer ${buttonClassName}`}
+        disabled={disabled}
+        className={`inline-flex items-center gap-1.5 text-xs font-mono font-medium whitespace-nowrap ${
+          disabled
+            ? 'opacity-40 cursor-not-allowed text-slate-400 dark:text-slate-500'
+            : 'text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white cursor-pointer focus:outline-none'
+        } ${buttonClassName}`}
         aria-expanded={open}
         aria-haspopup="dialog"
       >
-        {showIcon && <CalendarIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+        {showIcon && <CalendarIcon className={`w-3.5 h-3.5 shrink-0 ${disabled ? 'text-slate-400 dark:text-slate-500' : 'text-amber-500'}`} />}
         <span>{formatDateHuman(value, lang)}</span>
       </button>
 

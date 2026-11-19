@@ -224,7 +224,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-4">
         {/* KPI 1: Total Consumption & Average/Day */}
         <div className="bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-1.5">
+          <div className="flex items-center justify-between gap-1.5">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">
               {t.totalConsumption}
             </span>
@@ -246,7 +246,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
 
         {/* KPI 2: Total Grid Import & Average/Day */}
         <div className="bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-1.5">
+          <div className="flex items-center justify-between gap-1.5">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">
               {t.totalGridImport}
             </span>
@@ -268,7 +268,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
 
         {/* KPI 3: Battery Discharged / Charged */}
         <div className="bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-1.5">
+          <div className="flex items-center justify-between gap-1.5">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">
               {t.totalBatteryDischarge}
             </span>
@@ -290,7 +290,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
 
         {/* KPI 4: Inverter Consumption */}
         <div className="bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-1.5">
+          <div className="flex items-center justify-between gap-1.5">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">
               {t.totalInverterLoss}
             </span>
@@ -312,7 +312,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
 
         {/* KPI 5: Autonomy Ratio */}
         <div className="col-span-2 lg:col-span-1 bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-1.5">
+          <div className="flex items-center justify-between gap-1.5">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">
               {t.selfSufficiency}
             </span>

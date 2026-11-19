@@ -675,6 +675,8 @@ export default function App() {
     };
   }, [gridRangeRows]);
 
+  const isPeriodModeActive = activeTab === 'consumption' && periodMode !== '1d';
+
   const navLinks = [
     { id: 'dashboard', label: t.navDashboard || 'Dashboard', icon: Share2 },
     { id: 'consumption', label: t.navConsumption || 'Споживання', icon: Activity },
@@ -908,10 +910,15 @@ export default function App() {
           {/* Right cluster on >= 1024px (lg:): Date Navigator on the left, Refresh and Auth aligned to the far right. Full-width on mobile. */}
           <div className="flex items-center justify-between lg:justify-end gap-2 w-full lg:w-auto min-w-0">
             {/* Date Navigator: Full-width on mobile (< lg), compact on desktop */}
-            <div className="flex items-center justify-between w-full lg:w-auto rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] p-0.5 shadow-sm">
+            <div className={`flex items-center justify-between w-full lg:w-auto rounded-lg border p-0.5 shadow-sm transition-opacity ${
+              isPeriodModeActive
+                ? 'bg-slate-100/50 dark:bg-white/[0.02] border-slate-200/40 dark:border-white/[0.04] opacity-50'
+                : 'bg-slate-100/90 dark:bg-white/[0.05] border-slate-200/80 dark:border-white/[0.08]'
+            }`}>
               <button
                 onClick={handlePrevDay}
-                className="w-8 h-8 lg:w-7 lg:h-7 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/[0.08] rounded-md transition-all shrink-0"
+                disabled={isPeriodModeActive}
+                className="w-8 h-8 lg:w-7 lg:h-7 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/[0.08] disabled:opacity-30 disabled:pointer-events-none rounded-md transition-all shrink-0"
                 title={t.prevDay}
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -921,13 +928,15 @@ export default function App() {
                   value={selectedDate}
                   onChange={setSelectedDate}
                   lang={lang}
+                  disabled={isPeriodModeActive}
                   className="w-full justify-center"
                   buttonClassName="w-full justify-center px-2 py-1 text-xs"
                 />
               </div>
               <button
                 onClick={handleNextDay}
-                className="w-8 h-8 lg:w-7 lg:h-7 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/[0.08] rounded-md transition-all shrink-0"
+                disabled={isPeriodModeActive}
+                className="w-8 h-8 lg:w-7 lg:h-7 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/[0.08] disabled:opacity-30 disabled:pointer-events-none rounded-md transition-all shrink-0"
                 title={t.nextDay}
               >
                 <ChevronRight className="w-4 h-4" />
@@ -973,7 +982,7 @@ export default function App() {
         </header>
 
         {/* MAIN CONTENT AREA */}
-        <main className="relative pt-[104px] lg:pt-[76px] min-h-screen px-3 sm:px-6 py-4 sm:py-6 pb-20 transition-colors duration-200">
+        <main className="relative pt-[112px] lg:pt-[76px] min-h-screen px-3 sm:px-6 py-4 sm:py-6 pb-20 transition-colors duration-200">
           <div className="flex flex-col gap-6 max-w-[1600px] mx-auto">
             {/* TAB 1: DASHBOARD (KPI, Потоки енергії, Баланс потужності, Журнал внизу) */}
             {activeTab === 'dashboard' && (
@@ -1323,7 +1332,7 @@ export default function App() {
             {activeTab === 'consumption' && (
               <div className="flex flex-col gap-6">
                 {/* Period Mode Selector Toolbar in Consumption Tab */}
-                <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#111827]/90 rounded-2xl p-4 border border-slate-200/90 dark:border-white/[0.08] shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5 overflow-x-auto p-0.5 rounded-xl bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08]">
                     {[
                       { key: '1d', label: '1д' },
