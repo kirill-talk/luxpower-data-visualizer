@@ -29,7 +29,6 @@ import GridVoltageTempChart from './components/GridVoltageTempChart';
 import DataTable from './components/DataTable';
 import PowerFlowDiagram from './components/PowerFlowDiagram';
 import MobileKpiGrid from './components/mobile/MobileKpiGrid';
-import MobileStatusBar from './components/mobile/MobileStatusBar';
 import MobileRecentLog from './components/mobile/MobileRecentLog';
 import MobilePowerFlowDiagram from './components/mobile/MobilePowerFlowDiagram';
 import AuthModal from './components/AuthModal';
@@ -827,7 +826,8 @@ export default function App() {
                   <span className="shrink-0">SNA 6K</span>
                   {lastUpdated && (
                     <>
-                      <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">•</span>
+                      <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
+                      <span className="sm:hidden text-slate-600 dark:text-slate-300 shrink-0">{lastUpdated}</span>
                       <span className="hidden sm:inline">{t.updated}: <span className="text-slate-700 dark:text-slate-200">{lastUpdated}</span></span>
                     </>
                   )}
@@ -948,239 +948,218 @@ export default function App() {
         {/* MAIN CONTENT AREA */}
         <main className="relative pt-[112px] sm:pt-20 min-h-screen px-3 sm:px-6 py-4 sm:py-6 pb-20 transition-colors duration-200">
           <div className="flex flex-col gap-6 max-w-[1600px] mx-auto">
-            {/* MOBILE ONLY (< xl / < 1200px): QUICK STATUS BAR, KPI & COMPACT POWER FLOW */}
-            <div className="flex flex-col gap-4 xl:hidden">
-              <MobileStatusBar
-                serialNumber={customAuth?.defaultSerial || status?.defaultSerial || liveData?.serialNum || '—'}
-                lastUpdated={lastUpdated}
-                selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-                onRefresh={handleManualRefresh}
-                loading={loading}
-                isGridOnline={gridEpsInfo.isGridOnline}
-                lang={lang}
-              />
-
-              {/* 2x2 Compact KPI Matrix */}
-              <MobileKpiGrid
-                homeLoad={homeLoad}
-                isGridOnline={gridEpsInfo.isGridOnline}
-                dailyHomeCons={dailyHomeCons}
-                currentUptimeSec={currentUptimeSec}
-                estimatedRemainingSec={powerSourceDurations.estimatedRemainingSec}
-                totalBatterySec={powerSourceDurations.totalBatterySec}
-                totalGridSec={powerSourceDurations.totalGridSec}
-                soc={soc}
-                battCharge={battCharge}
-                battDischarge={battDischarge}
-                timeToFullChargeSec={timeToFullChargeSec}
-                dailyChg={dailyChg}
-                dailyDisChg={dailyDisChg}
-                gridImport={gridImport}
-                gridVoltage={gridEpsInfo.voltage}
-                gridFrequency={gridEpsInfo.frequency}
-                dailyGridImport={dailyGridImport}
-                currentInverterLoss={currentInverterLoss}
-                inverterTemp={liveInverterTemp ?? '--'}
-                lang={lang}
-              />
-
-              {/* Mobile-optimized Power Flow Diagram */}
-              <MobilePowerFlowDiagram
-                solarPower={solarPower}
-                pv1Voltage={pv1Voltage}
-                pv2Voltage={pv2Voltage}
-                gridPower={gridImport}
-                homeLoad={homeLoad}
-                batteryPower={battCharge > 0 ? battCharge : (battDischarge > 0 ? -battDischarge : 0)}
-                soc={soc}
-                inverterLoss={currentInverterLoss}
-                gridVoltage={gridEpsInfo.voltage}
-                gridFrequency={gridEpsInfo.frequency}
-                isGridOnline={gridEpsInfo.isGridOnline}
-                isEpsActive={!gridEpsInfo.isGridOnline}
-                inverterTemp={liveInverterTemp ?? '--'}
-                batteryVoltage={liveBatteryVoltage}
-                batteryCurrent={batteryCurrent}
-                batteryHealth={batteryHealth}
-                loadPercent={loadPercent}
-                lang={lang}
-              />
-
-              {/* Recent telemetry event card */}
-              <MobileRecentLog
-                latestRow={latestRow}
-                totalRows={tableRows.length}
-                lang={lang}
-                onShowAll={() => {
-                  setActiveTab('telemetry-logs');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              />
-            </div>
-
-            {/* DESKTOP KPI INSTRUMENT STRIP (4 Modules) - Visible on 1200px+ (xl) */}
-            <section className="hidden xl:grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 w-full">
-              {/* KPI 1: Power Source Uptime (Battery or Grid) with Live Timer */}
-              <div className={`relative bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-5 border shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between group transition-all ${
-                gridEpsInfo.isGridOnline
-                  ? 'border-slate-200/90 dark:border-white/[0.08] hover:border-emerald-500/40'
-                  : 'border-amber-500/30 hover:border-amber-500/50'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    {gridEpsInfo.isGridOnline ? t.gridUptime : t.batteryUptime}
-                  </span>
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
-                    gridEpsInfo.isGridOnline
-                      ? 'bg-emerald-500/10 dark:bg-emerald-500/15 border-emerald-500/20 text-emerald-500'
-                      : 'bg-amber-500/10 dark:bg-amber-500/15 border-amber-500/20 text-amber-500'
-                  }`}>
-                    <Clock className={`w-4 h-4 ${gridEpsInfo.isGridOnline ? 'text-emerald-500' : 'text-amber-500'}`} />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between gap-2 my-3">
-                  <span className={`font-mono text-3xl font-extrabold tracking-tight font-tabular ${
-                    gridEpsInfo.isGridOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'
-                  }`}>
-                    {formatDurationHuman(currentUptimeSec, lang === 'en', true)}
-                  </span>
-                  {!gridEpsInfo.isGridOnline && powerSourceDurations.estimatedRemainingSec !== null && (
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-mono uppercase text-slate-400">
-                        {t.estRemaining}
-                      </span>
-                      <span className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                        ~{formatDurationHuman(powerSourceDurations.estimatedRemainingSec, lang === 'en', false)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3 text-slate-500 dark:text-slate-400">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                    <span>{lang === 'en' ? '24h Bat' : 'АКБ 24г'}: <strong className="font-semibold text-slate-700 dark:text-slate-300">{formatDurationHuman(powerSourceDurations.totalBatterySec, lang === 'en', false)}</strong></span>
-                  </div>
-                  <span className="text-slate-300 dark:text-slate-600">•</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <span>{lang === 'en' ? '24h Grid' : 'Мережа 24г'}: <strong className="font-semibold text-slate-700 dark:text-slate-300">{formatDurationHuman(powerSourceDurations.totalGridSec, lang === 'en', false)}</strong></span>
-                  </div>
-                </div>
-              </div>
-
-              {/* KPI 2: Battery */}
-              <div className={`relative bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between group transition-all ${
-                battCharge > 0 ? 'hover:border-emerald-500/40' : (battDischarge > 0 ? 'hover:border-rose-500/40' : 'hover:border-slate-400/40')
-              }`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    {t.kpiBattery}
-                  </span>
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-colors ${
-                    battCharge > 0
-                      ? 'bg-emerald-500/10 dark:bg-emerald-500/15 border-emerald-500/20 text-emerald-500'
-                      : battDischarge > 0
-                        ? 'bg-rose-500/10 dark:bg-rose-500/15 border-rose-500/20 text-rose-500'
-                        : 'bg-slate-500/10 dark:bg-slate-500/15 border-slate-500/20 text-slate-400'
-                  }`}>
-                    {battCharge > 0 ? (
-                      <BatteryCharging className="w-4 h-4 text-emerald-500" />
-                    ) : (
-                      <Battery className={`w-4 h-4 ${battDischarge > 0 ? 'text-rose-500' : 'text-slate-400'}`} />
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between gap-2 my-3">
-                  <div className="flex items-baseline gap-2">
-                    <span className={`font-mono text-3xl font-extrabold tracking-tight font-tabular ${
-                      battCharge > 0 ? 'text-emerald-500' : (battDischarge > 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white')
-                    }`}>
-                      {soc}%
-                    </span>
-                    <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                      {battCharge > 0 ? `(${t.chargeWord} ${battCharge} ${unitW})` : (battDischarge > 0 ? `(${t.dischargeWord} ${battDischarge} ${unitW})` : `(${t.standby})`)}
-                    </span>
-                  </div>
-                  {battCharge > 0 && timeToFullChargeSec !== null && (
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-mono uppercase text-slate-400">
-                        {t.estTimeToFull}
-                      </span>
-                      <span className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                        ~{formatDurationHuman(timeToFullChargeSec, lang === 'en', false)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">+{dailyChg} {unitKwh}</span>
-                  <span className="text-rose-500 dark:text-rose-400 font-semibold">-{dailyDisChg} {unitKwh}</span>
-                </div>
-              </div>
-
-              {/* KPI 3: Grid Import */}
-              <div className="relative bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between group hover:border-rose-500/40 transition-all">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    {t.kpiGridImport}
-                  </span>
-                  <div className={`w-8 h-8 rounded-xl border flex items-center justify-center ${
-                    gridImport > 0
-                      ? 'bg-rose-500/10 dark:bg-rose-500/15 border-rose-500/20 text-rose-500'
-                      : 'bg-emerald-500/10 dark:bg-emerald-500/15 border-emerald-500/20 text-emerald-500'
-                  }`}>
-                    <Zap className={`w-4 h-4 ${gridImport > 0 ? 'text-rose-500' : 'text-emerald-500'}`} />
-                  </div>
-                </div>
-                <div className="flex items-baseline gap-2 my-3">
-                  <span className="font-mono text-3xl font-extrabold text-rose-500 dark:text-rose-400 tracking-tight font-tabular">
-                    {gridImport}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{unitW}</span>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-white/[0.06] pt-3">
-                  <span className={`w-2 h-2 rounded-full ${gridEpsInfo.isGridOnline ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]' : 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]'}`}></span>
-                  <span className={`font-medium ${gridEpsInfo.isGridOnline ? 'text-slate-700 dark:text-slate-300' : 'text-rose-600 dark:text-rose-400'}`}>
-                    {gridEpsInfo.isGridOnline ? `${gridEpsInfo.voltage} ${unitV} • ${gridEpsInfo.frequency} ${unitHz}` : t.gridOffline}
-                  </span>
-                  <span>•</span>
-                  <span>{t.dayTotal}: <span className="text-slate-900 dark:text-white font-semibold">{dailyGridImport} {unitKwh}</span></span>
-                </div>
-              </div>
-
-              {/* KPI 4: Inverter Losses */}
-              <div className="relative bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between group hover:border-purple-500/40 transition-all">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    {t.kpiInverterLoss}
-                  </span>
-                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 dark:bg-purple-500/15 border border-purple-500/20 flex items-center justify-center text-purple-500">
-                    <Cpu className="w-4 h-4 text-purple-500" />
-                  </div>
-                </div>
-                <div className="flex items-baseline gap-2 my-3">
-                  <span className="font-mono text-3xl font-extrabold text-purple-500 dark:text-purple-400 tracking-tight font-tabular">
-                    ~{currentInverterLoss}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{unitW}</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3">
-                  <div className="flex items-center gap-1 text-purple-500 dark:text-purple-400 font-semibold">
-                    <Flame className="w-3.5 h-3.5 text-purple-500" />
-                    <span>{liveInverterTemp !== undefined ? `${liveInverterTemp}°C` : '--'}</span>
-                  </div>
-                  <span className="text-slate-500 dark:text-slate-400">
-                    {gridEpsInfo.isGridOnline ? t.bypassCharging : t.epsMode}
-                  </span>
-                </div>
-              </div>
-            </section>
-
-            {/* TAB 1: DASHBOARD (Потоки енергії & Баланс потужності) */}
+            {/* TAB 1: DASHBOARD (KPI, Потоки енергії, Баланс потужності, Журнал внизу) */}
             {activeTab === 'dashboard' && (
-              <div className="flex flex-col gap-6">
-                {/* Power Flow Diagram (Desktop) */}
+              <div className="flex flex-col gap-4 xl:gap-6">
+                {/* MOBILE KPI 2x2 MATRIX (< xl) */}
+                <div className="xl:hidden">
+                  <MobileKpiGrid
+                    homeLoad={homeLoad}
+                    isGridOnline={gridEpsInfo.isGridOnline}
+                    dailyHomeCons={dailyHomeCons}
+                    currentUptimeSec={currentUptimeSec}
+                    estimatedRemainingSec={powerSourceDurations.estimatedRemainingSec}
+                    totalBatterySec={powerSourceDurations.totalBatterySec}
+                    totalGridSec={powerSourceDurations.totalGridSec}
+                    soc={soc}
+                    battCharge={battCharge}
+                    battDischarge={battDischarge}
+                    timeToFullChargeSec={timeToFullChargeSec}
+                    dailyChg={dailyChg}
+                    dailyDisChg={dailyDisChg}
+                    gridImport={gridImport}
+                    gridVoltage={gridEpsInfo.voltage}
+                    gridFrequency={gridEpsInfo.frequency}
+                    dailyGridImport={dailyGridImport}
+                    currentInverterLoss={currentInverterLoss}
+                    inverterTemp={liveInverterTemp ?? '--'}
+                    lang={lang}
+                  />
+                </div>
+
+                {/* DESKTOP KPI INSTRUMENT STRIP (4 Modules) - Visible on 1200px+ (xl) */}
+                <section className="hidden xl:grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 w-full">
+                  {/* KPI 1: Power Source Uptime (Battery or Grid) with Live Timer */}
+                  <div className={`relative bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-5 border shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between group transition-all ${
+                    gridEpsInfo.isGridOnline
+                      ? 'border-slate-200/90 dark:border-white/[0.08] hover:border-emerald-500/40'
+                      : 'border-amber-500/30 hover:border-amber-500/50'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {gridEpsInfo.isGridOnline ? t.gridUptime : t.batteryUptime}
+                      </span>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
+                        gridEpsInfo.isGridOnline
+                          ? 'bg-emerald-500/10 dark:bg-emerald-500/15 border-emerald-500/20 text-emerald-500'
+                          : 'bg-amber-500/10 dark:bg-amber-500/15 border-amber-500/20 text-amber-500'
+                      }`}>
+                        <Clock className={`w-4 h-4 ${gridEpsInfo.isGridOnline ? 'text-emerald-500' : 'text-amber-500'}`} />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 my-3">
+                      <span className={`font-mono text-3xl font-extrabold tracking-tight font-tabular ${
+                        gridEpsInfo.isGridOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'
+                      }`}>
+                        {formatDurationHuman(currentUptimeSec, lang === 'en', true)}
+                      </span>
+                      {!gridEpsInfo.isGridOnline && powerSourceDurations.estimatedRemainingSec !== null && (
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] font-mono uppercase text-slate-400">
+                            {t.estRemaining}
+                          </span>
+                          <span className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                            ~{formatDurationHuman(powerSourceDurations.estimatedRemainingSec, lang === 'en', false)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3 text-slate-500 dark:text-slate-400">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                        <span>{lang === 'en' ? '24h Bat' : 'АКБ 24г'}: <strong className="font-semibold text-slate-700 dark:text-slate-300">{formatDurationHuman(powerSourceDurations.totalBatterySec, lang === 'en', false)}</strong></span>
+                      </div>
+                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span>{lang === 'en' ? '24h Grid' : 'Мережа 24г'}: <strong className="font-semibold text-slate-700 dark:text-slate-300">{formatDurationHuman(powerSourceDurations.totalGridSec, lang === 'en', false)}</strong></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* KPI 2: Battery */}
+                  <div className={`relative bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between group transition-all ${
+                    battCharge > 0 ? 'hover:border-emerald-500/40' : (battDischarge > 0 ? 'hover:border-rose-500/40' : 'hover:border-slate-400/40')
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {t.kpiBattery}
+                      </span>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-colors ${
+                        battCharge > 0
+                          ? 'bg-emerald-500/10 dark:bg-emerald-500/15 border-emerald-500/20 text-emerald-500'
+                          : battDischarge > 0
+                            ? 'bg-rose-500/10 dark:bg-rose-500/15 border-rose-500/20 text-rose-500'
+                            : 'bg-slate-500/10 dark:bg-slate-500/15 border-slate-500/20 text-slate-400'
+                      }`}>
+                        {battCharge > 0 ? (
+                          <BatteryCharging className="w-4 h-4 text-emerald-500" />
+                        ) : (
+                          <Battery className={`w-4 h-4 ${battDischarge > 0 ? 'text-rose-500' : 'text-slate-400'}`} />
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 my-3">
+                      <div className="flex items-baseline gap-2">
+                        <span className={`font-mono text-3xl font-extrabold tracking-tight font-tabular ${
+                          battCharge > 0 ? 'text-emerald-500' : (battDischarge > 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white')
+                        }`}>
+                          {soc}%
+                        </span>
+                        <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                          {battCharge > 0 ? `(${t.chargeWord} ${battCharge} ${unitW})` : (battDischarge > 0 ? `(${t.dischargeWord} ${battDischarge} ${unitW})` : `(${t.standby})`)}
+                        </span>
+                      </div>
+                      {battCharge > 0 && timeToFullChargeSec !== null && (
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] font-mono uppercase text-slate-400">
+                            {t.estTimeToFull}
+                          </span>
+                          <span className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                            ~{formatDurationHuman(timeToFullChargeSec, lang === 'en', false)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">+{dailyChg} {unitKwh}</span>
+                      <span className="text-rose-500 dark:text-rose-400 font-semibold">-{dailyDisChg} {unitKwh}</span>
+                    </div>
+                  </div>
+
+                  {/* KPI 3: Grid Import */}
+                  <div className="relative bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between group hover:border-rose-500/40 transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {t.kpiGridImport}
+                      </span>
+                      <div className={`w-8 h-8 rounded-xl border flex items-center justify-center ${
+                        gridImport > 0
+                          ? 'bg-rose-500/10 dark:bg-rose-500/15 border-rose-500/20 text-rose-500'
+                          : 'bg-emerald-500/10 dark:bg-emerald-500/15 border-emerald-500/20 text-emerald-500'
+                      }`}>
+                        <Zap className={`w-4 h-4 ${gridImport > 0 ? 'text-rose-500' : 'text-emerald-500'}`} />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline gap-2 my-3">
+                      <span className="font-mono text-3xl font-extrabold text-rose-500 dark:text-rose-400 tracking-tight font-tabular">
+                        {gridImport}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{unitW}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-white/[0.06] pt-3">
+                      <span className={`w-2 h-2 rounded-full ${gridEpsInfo.isGridOnline ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]' : 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]'}`}></span>
+                      <span className={`font-medium ${gridEpsInfo.isGridOnline ? 'text-slate-700 dark:text-slate-300' : 'text-rose-600 dark:text-rose-400'}`}>
+                        {gridEpsInfo.isGridOnline ? `${gridEpsInfo.voltage} ${unitV} • ${gridEpsInfo.frequency} ${unitHz}` : t.gridOffline}
+                      </span>
+                      <span>•</span>
+                      <span>{t.dayTotal}: <span className="text-slate-900 dark:text-white font-semibold">{dailyGridImport} {unitKwh}</span></span>
+                    </div>
+                  </div>
+
+                  {/* KPI 4: Inverter Losses */}
+                  <div className="relative bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between group hover:border-purple-500/40 transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {t.kpiInverterLoss}
+                      </span>
+                      <div className="w-8 h-8 rounded-xl bg-purple-500/10 dark:bg-purple-500/15 border border-purple-500/20 flex items-center justify-center text-purple-500">
+                        <Cpu className="w-4 h-4 text-purple-500" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline gap-2 my-3">
+                      <span className="font-mono text-3xl font-extrabold text-purple-500 dark:text-purple-400 tracking-tight font-tabular">
+                        ~{currentInverterLoss}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{unitW}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3">
+                      <div className="flex items-center gap-1 text-purple-500 dark:text-purple-400 font-semibold">
+                        <Flame className="w-3.5 h-3.5 text-purple-500" />
+                        <span>{liveInverterTemp !== undefined ? `${liveInverterTemp}°C` : '--'}</span>
+                      </div>
+                      <span className="text-slate-500 dark:text-slate-400">
+                        {gridEpsInfo.isGridOnline ? t.bypassCharging : t.epsMode}
+                      </span>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Mobile-optimized Power Flow Diagram (< xl) */}
+                <div className="xl:hidden">
+                  <MobilePowerFlowDiagram
+                    solarPower={solarPower}
+                    pv1Voltage={pv1Voltage}
+                    pv2Voltage={pv2Voltage}
+                    gridPower={gridImport}
+                    homeLoad={homeLoad}
+                    batteryPower={battCharge > 0 ? battCharge : (battDischarge > 0 ? -battDischarge : 0)}
+                    soc={soc}
+                    inverterLoss={currentInverterLoss}
+                    gridVoltage={gridEpsInfo.voltage}
+                    gridFrequency={gridEpsInfo.frequency}
+                    isGridOnline={gridEpsInfo.isGridOnline}
+                    isEpsActive={!gridEpsInfo.isGridOnline}
+                    inverterTemp={liveInverterTemp ?? '--'}
+                    batteryVoltage={liveBatteryVoltage}
+                    batteryCurrent={batteryCurrent}
+                    batteryHealth={batteryHealth}
+                    loadPercent={loadPercent}
+                    lang={lang}
+                  />
+                </div>
+
+                {/* Power Flow Diagram (Desktop xl+) */}
                 <div id="power-flow" className="hidden xl:block">
                   <PowerFlowDiagram
                     solarPower={solarPower}
@@ -1292,6 +1271,19 @@ export default function App() {
 
                   <PowerFlowChart rawData={chartData} onZoomChange={setRangePoints} lang={lang} />
                 </section>
+
+                {/* Recent telemetry event card at bottom (< xl) */}
+                <div className="xl:hidden">
+                  <MobileRecentLog
+                    latestRow={latestRow}
+                    totalRows={tableRows.length}
+                    lang={lang}
+                    onShowAll={() => {
+                      setActiveTab('telemetry-logs');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                  />
+                </div>
               </div>
             )}
 

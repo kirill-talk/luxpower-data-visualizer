@@ -221,116 +221,116 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
   return (
     <div className="flex flex-col gap-5 w-full">
       {/* 5 Summary KPI Modules for Period (including Inverter Loss / Consumption) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-4">
         {/* KPI 1: Total Consumption & Average/Day */}
-        <div className="bg-white dark:bg-[#111827]/90 rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <div className="bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-1.5">
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">
               {t.totalConsumption}
             </span>
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
-              <Home className="w-4 h-4" />
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+              <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2 my-3">
-            <span className="font-mono text-3xl font-extrabold text-amber-500 dark:text-amber-400 tracking-tight font-tabular">
+          <div className="flex items-baseline gap-1.5 sm:gap-2 my-2 sm:my-3">
+            <span className="font-mono text-2xl sm:text-3xl font-extrabold text-amber-500 dark:text-amber-400 tracking-tight font-tabular">
               {totalConsumptionKwh}
             </span>
-            <span className="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">{unitKwh}</span>
+            <span className="text-[11px] sm:text-xs font-mono font-medium text-slate-500 dark:text-slate-400">{unitKwh}</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3 text-slate-500 dark:text-slate-400">
-            <span>{t.avgDailyLoad}:</span>
-            <strong className="text-slate-900 dark:text-white font-semibold">{avgDailyLoad} {unitKwh}</strong>
+          <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-2 sm:pt-3 text-slate-500 dark:text-slate-400">
+            <span className="truncate">{t.avgDailyLoad}:</span>
+            <strong className="text-slate-900 dark:text-white font-semibold whitespace-nowrap">{avgDailyLoad} {unitKwh}</strong>
           </div>
         </div>
 
         {/* KPI 2: Total Grid Import & Average/Day */}
-        <div className="bg-white dark:bg-[#111827]/90 rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <div className="bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-1.5">
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">
               {t.totalGridImport}
             </span>
-            <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500">
-              <Zap className="w-4 h-4" />
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shrink-0">
+              <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2 my-3">
-            <span className="font-mono text-3xl font-extrabold text-rose-500 dark:text-rose-400 tracking-tight font-tabular">
+          <div className="flex items-baseline gap-1.5 sm:gap-2 my-2 sm:my-3">
+            <span className="font-mono text-2xl sm:text-3xl font-extrabold text-rose-500 dark:text-rose-400 tracking-tight font-tabular">
               {totalGridImportKwh}
             </span>
-            <span className="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">{unitKwh}</span>
+            <span className="text-[11px] sm:text-xs font-mono font-medium text-slate-500 dark:text-slate-400">{unitKwh}</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3 text-slate-500 dark:text-slate-400">
-            <span>{t.avgDailyGrid}:</span>
-            <strong className="text-slate-900 dark:text-white font-semibold">{avgDailyGrid} {unitKwh}</strong>
+          <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-2 sm:pt-3 text-slate-500 dark:text-slate-400">
+            <span className="truncate">{t.avgDailyGrid}:</span>
+            <strong className="text-slate-900 dark:text-white font-semibold whitespace-nowrap">{avgDailyGrid} {unitKwh}</strong>
           </div>
         </div>
 
         {/* KPI 3: Battery Discharged / Charged */}
-        <div className="bg-white dark:bg-[#111827]/90 rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <div className="bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-1.5">
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">
               {t.totalBatteryDischarge}
             </span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
-              <BatteryCharging className="w-4 h-4" />
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
+              <BatteryCharging className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2 my-3 font-mono">
-            <span className="text-3xl font-extrabold text-emerald-500 tracking-tight font-tabular">
+          <div className="flex items-baseline gap-1.5 sm:gap-2 my-2 sm:my-3 font-mono">
+            <span className="text-2xl sm:text-3xl font-extrabold text-emerald-500 tracking-tight font-tabular">
               {totalBatteryDischargeKwh}
             </span>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{unitKwh}</span>
+            <span className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400">{unitKwh}</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3 text-slate-500 dark:text-slate-400">
-            <span>{isEn ? 'Charged' : 'Заряджено'}:</span>
-            <strong className="text-blue-500 dark:text-blue-400 font-semibold">+{totalBatteryChargeKwh} {unitKwh}</strong>
+          <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-2 sm:pt-3 text-slate-500 dark:text-slate-400">
+            <span className="truncate">{isEn ? 'Charged' : 'Заряджено'}:</span>
+            <strong className="text-blue-500 dark:text-blue-400 font-semibold whitespace-nowrap">+{totalBatteryChargeKwh} {unitKwh}</strong>
           </div>
         </div>
 
         {/* KPI 4: Inverter Consumption */}
-        <div className="bg-white dark:bg-[#111827]/90 rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <div className="bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-1.5">
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">
               {t.totalInverterLoss}
             </span>
-            <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500">
-              <Cpu className="w-4 h-4" />
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0">
+              <Cpu className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2 my-3 font-mono">
-            <span className="text-3xl font-extrabold text-purple-500 dark:text-purple-400 tracking-tight font-tabular">
+          <div className="flex items-baseline gap-1.5 sm:gap-2 my-2 sm:my-3 font-mono">
+            <span className="text-2xl sm:text-3xl font-extrabold text-purple-500 dark:text-purple-400 tracking-tight font-tabular">
               {totalInverterLossKwh}
             </span>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{unitKwh}</span>
+            <span className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400">{unitKwh}</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3 text-slate-500 dark:text-slate-400">
-            <span>{isEn ? 'Cost' : 'Вартість'}:</span>
-            <strong className="text-purple-600 dark:text-purple-300 font-semibold">≈{totalInverterCostUah} ₴</strong>
+          <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-2 sm:pt-3 text-slate-500 dark:text-slate-400">
+            <span className="truncate">{isEn ? 'Cost' : 'Вартість'}:</span>
+            <strong className="text-purple-600 dark:text-purple-300 font-semibold whitespace-nowrap">≈{totalInverterCostUah} ₴</strong>
           </div>
         </div>
 
         {/* KPI 5: Autonomy Ratio */}
-        <div className="bg-white dark:bg-[#111827]/90 rounded-2xl p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <div className="col-span-2 lg:col-span-1 bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-1.5">
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">
               {t.selfSufficiency}
             </span>
-            <div className="w-8 h-8 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-500">
-              <Percent className="w-4 h-4" />
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-500 shrink-0">
+              <Percent className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2 my-3">
-            <span className="font-mono text-3xl font-extrabold text-teal-500 dark:text-teal-400 tracking-tight font-tabular">
+          <div className="flex items-baseline gap-1.5 sm:gap-2 my-2 sm:my-3">
+            <span className="font-mono text-2xl sm:text-3xl font-extrabold text-teal-500 dark:text-teal-400 tracking-tight font-tabular">
               {batterySharePct}%
             </span>
-            <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] sm:text-xs font-mono text-slate-500 dark:text-slate-400">
               ({daysCount} {t.periodDaysCount})
             </span>
           </div>
-          <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3 text-slate-500 dark:text-slate-400">
-            <span>{isEn ? 'Battery cover' : 'Покриття АКБ'}:</span>
-            <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">{totalBatteryDischargeKwh} {unitKwh}</strong>
+          <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-2 sm:pt-3 text-slate-500 dark:text-slate-400">
+            <span className="truncate">{isEn ? 'Battery cover' : 'Покриття АКБ'}:</span>
+            <strong className="text-emerald-600 dark:text-emerald-400 font-semibold whitespace-nowrap">{totalBatteryDischargeKwh} {unitKwh}</strong>
           </div>
         </div>
       </div>
