@@ -759,21 +759,52 @@ export default function App() {
           </div>
         </div>
 
-        {/* Footer pill: Inverter State */}
-        <div className="p-4 border-t border-slate-200/80 dark:border-white/[0.08] bg-slate-50/70 dark:bg-[#070b14]/50">
+        {/* Footer pill: Inverter State, Serial, Language & Theme */}
+        <div className="p-4 border-t border-slate-200/80 dark:border-white/[0.08] bg-slate-50/70 dark:bg-[#070b14]/50 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">
                 {t.inverter}
               </span>
-              <span className="text-[11px] font-mono font-semibold text-slate-700 dark:text-slate-300">
+              <span className="text-[12px] font-mono font-semibold text-slate-700 dark:text-slate-300">
                 SNA 6K
+              </span>
+              <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                SN: <strong className="font-semibold text-slate-700 dark:text-slate-300">{customAuth?.defaultSerial || status?.defaultSerial || liveData?.serialNum || '—'}</strong>
               </span>
             </div>
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"></span>
               <span>{gridEpsInfo.isGridOnline ? t.online : t.epsMode}</span>
             </div>
+          </div>
+
+          {/* Language & Theme switches inside drawer menu */}
+          <div className="pt-2 border-t border-slate-200/60 dark:border-white/[0.05] flex items-center justify-between">
+            <button
+              onClick={toggleLang}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-white/[0.06] border border-slate-200/80 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 font-mono text-xs font-bold hover:bg-slate-100 dark:hover:bg-white/[0.1] transition-all shadow-sm"
+              title={t.toggleLang}
+            >
+              <span>{lang === 'en' ? '🇺🇦 UA' : '🇬🇧 EN'}</span>
+            </button>
+            <button
+              onClick={toggleTheme}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-white/[0.06] border border-slate-200/80 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 text-xs font-medium hover:bg-slate-100 dark:hover:bg-white/[0.1] transition-all shadow-sm"
+              title={t.changeTheme}
+            >
+              {isDark ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span className="text-[11px]">Light</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-slate-600" />
+                  <span className="text-[11px]">Dark</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </aside>
@@ -782,9 +813,9 @@ export default function App() {
       <div className="lg:pl-64">
         {/* TOP HEADER */}
         <header className="fixed top-0 left-0 lg:left-64 right-0 min-h-16 bg-white/85 dark:bg-[#0a0e17]/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08] z-40 px-3 sm:px-6 py-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 transition-colors duration-200">
-          {/* Identity & Status */}
-          <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
+          {/* Identity & Status: In single row on mobile (220V, LAN, Update Time, Auth) */}
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="lg:hidden p-1.5 -ml-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.05] shrink-0"
@@ -792,80 +823,84 @@ export default function App() {
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <div className="flex flex-col min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border shadow-[0_0_10px_rgba(16,185,129,0.15)] whitespace-nowrap ${
-                    gridEpsInfo.isGridOnline
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${gridEpsInfo.isGridOnline ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                    <span className="text-[9px] sm:text-[10px] font-mono uppercase font-bold tracking-wider">
-                      {gridEpsInfo.isGridOnline ? t.grid220 : 'EPS'}
-                    </span>
-                  </div>
-                  {dataSource && (
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-mono font-semibold whitespace-nowrap ${
-                        dataSource === 'dongle'
-                          ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400'
-                          : 'bg-slate-100 dark:bg-white/[0.06] border-slate-200 dark:border-white/[0.1] text-slate-500 dark:text-slate-400'
-                      }`}
-                      title={dataSource === 'dongle'
-                        ? (lang === 'en' ? 'Live telemetry directly from LAN Wi-Fi dongle (Read-Only)' : 'Жива телеметрія напряму з LAN-донгла (Read-Only)')
-                        : (lang === 'en' ? 'Telemetry from Luxpower Cloud' : 'Телеметрія з хмари Luxpower')}
-                    >
-                      <Radio className="w-2.5 h-2.5 shrink-0" />
-                      <span>{dataSource === 'dongle' ? 'LAN Dongle' : 'Cloud'}</span>
-                    </span>
-                  )}
+
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                {/* 220V / EPS status badge */}
+                <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border shadow-[0_0_10px_rgba(16,185,129,0.15)] whitespace-nowrap shrink-0 ${
+                  gridEpsInfo.isGridOnline
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${gridEpsInfo.isGridOnline ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                  <span className="text-[9px] sm:text-[10px] font-mono uppercase font-bold tracking-wider">
+                    {gridEpsInfo.isGridOnline ? t.grid220 : 'EPS'}
+                  </span>
                 </div>
-                <div className="text-[10px] sm:text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 truncate">
+
+                {/* LAN Dongle / Cloud badge */}
+                {dataSource && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-mono font-semibold whitespace-nowrap shrink-0 ${
+                      dataSource === 'dongle'
+                        ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400'
+                        : 'bg-slate-100 dark:bg-white/[0.06] border-slate-200 dark:border-white/[0.1] text-slate-500 dark:text-slate-400'
+                    }`}
+                    title={dataSource === 'dongle'
+                      ? (lang === 'en' ? 'Live telemetry directly from LAN Wi-Fi dongle (Read-Only)' : 'Жива телеметрія напряму з LAN-донгла (Read-Only)')
+                      : (lang === 'en' ? 'Telemetry from Luxpower Cloud' : 'Телеметрія з хмари Luxpower')}
+                  >
+                    <Radio className="w-2.5 h-2.5 shrink-0" />
+                    <span>{dataSource === 'dongle' ? 'LAN Dongle' : 'Cloud'}</span>
+                  </span>
+                )}
+
+                {/* Desktop SN & Inverter model */}
+                <div className="hidden lg:flex items-center gap-1.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
                   <span className="truncate">SN: <strong className="font-semibold text-slate-700 dark:text-slate-200">{customAuth?.defaultSerial || status?.defaultSerial || liveData?.serialNum || '—'}</strong></span>
-                  <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
-                  <span className="shrink-0">SNA 6K</span>
-                  {lastUpdated && (
-                    <>
-                      <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
-                      <span className="sm:hidden text-slate-600 dark:text-slate-300 shrink-0">{lastUpdated}</span>
-                      <span className="hidden sm:inline">{t.updated}: <span className="text-slate-700 dark:text-slate-200">{lastUpdated}</span></span>
-                    </>
-                  )}
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <span>SNA 6K</span>
                 </div>
+
+                {/* Update Time with Clock icon */}
+                {lastUpdated && (
+                  <div
+                    className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap shrink-0"
+                    title={t.updated}
+                  >
+                    <Clock className="w-3 h-3 text-slate-400 dark:text-slate-500 shrink-0" />
+                    <span className="text-slate-700 dark:text-slate-200 font-semibold">{lastUpdated}</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Mobile-only controls: Auth, Language toggle and theme toggle */}
-            <div className="sm:hidden flex items-center gap-1 shrink-0">
+            {/* Auth Button in header */}
+            <div className="flex items-center shrink-0">
               <button
                 onClick={() => setAuthModalOpen(true)}
-                className={`flex items-center justify-center w-8 h-8 rounded-lg border transition-all shadow-sm ${
+                className={`flex items-center justify-center sm:px-2.5 sm:gap-1.5 h-8 rounded-lg border text-xs font-mono font-semibold transition-all shadow-sm ${
                   status?.connected || customAuth
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                    : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                    ? 'w-8 sm:w-auto px-0 bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : 'w-8 sm:w-auto px-0 bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400 animate-pulse'
                 }`}
                 title={status?.connected || customAuth ? t.authStatusConnected : t.authSignIn}
               >
-                {status?.connected || customAuth ? <UserCheck className="w-4 h-4 text-emerald-500" /> : <Lock className="w-4 h-4 text-amber-500" />}
-              </button>
-              <button
-                onClick={toggleLang}
-                className="flex items-center justify-center min-w-[32px] px-1.5 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 font-mono text-xs font-bold transition-all shadow-sm"
-                title={t.toggleLang}
-              >
-                {lang === 'en' ? 'UA' : 'EN'}
-              </button>
-              <button
-                onClick={toggleTheme}
-                className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-slate-600 dark:text-amber-400 transition-all shadow-sm"
-                title={t.changeTheme}
-              >
-                {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+                {status?.connected || customAuth ? (
+                  <>
+                    <UserCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="hidden sm:inline max-w-[100px] truncate">{customAuth?.account || status?.account || 'Auth'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span className="hidden sm:inline">{t.authSignIn}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
 
-          {/* Controls: Date, Refresh, Auth, Language, Theme Toggle */}
+          {/* Controls: Date & Refresh */}
           <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2 min-w-0">
             {/* Date Navigator: Custom Monday-first calendar picker in header */}
             <div className="inline-flex items-center rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] p-0.5 shadow-sm shrink-0">
@@ -900,47 +935,6 @@ export default function App() {
             >
               <RefreshCw className={`w-3.5 h-3.5 text-emerald-500 ${loading ? 'animate-spin' : ''}`} />
               <span>{t.refresh}</span>
-            </button>
-
-            {/* Desktop Auth Button */}
-            <button
-              onClick={() => setAuthModalOpen(true)}
-              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg border text-xs font-mono font-semibold transition-all shadow-sm shrink-0 ${
-                status?.connected || customAuth
-                  ? 'bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400 animate-pulse'
-              }`}
-              title={status?.connected || customAuth ? t.authStatusConnected : t.authSignIn}
-            >
-              {status?.connected || customAuth ? (
-                <>
-                  <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="max-w-[100px] truncate">{customAuth?.account || status?.account || 'Auth'}</span>
-                </>
-              ) : (
-                <>
-                  <Lock className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{t.authSignIn}</span>
-                </>
-              )}
-            </button>
-
-            {/* Desktop Language Switcher */}
-            <button
-              onClick={toggleLang}
-              className="hidden sm:flex items-center justify-center px-2.5 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/[0.1] font-mono text-xs font-bold transition-all shadow-sm shrink-0"
-              title={t.toggleLang}
-            >
-              {lang === 'en' ? 'UA' : 'EN'}
-            </button>
-
-            {/* Desktop Theme Toggle Button */}
-            <button
-              onClick={toggleTheme}
-              className="hidden sm:flex relative items-center justify-center w-8 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-slate-600 dark:text-amber-400 hover:bg-white dark:hover:bg-white/[0.1] transition-all shadow-sm shrink-0"
-              title={t.changeTheme}
-            >
-              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
             </button>
           </div>
         </header>
