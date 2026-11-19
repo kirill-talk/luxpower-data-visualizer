@@ -90,7 +90,7 @@ export async function apiFetch(path, options = {}) {
 
     if (!res.ok && res.status >= 500 && canFallback) {
       primaryDownUntil = Date.now() + PRIMARY_COOLDOWN_MS;
-      console.warn(`[apiFetch] Primary (${primaryBase}) returned HTTP ${res.status}, falling back to ${fallbackBase}`);
+      console.warn(`[apiFetch] Primary API returned HTTP ${res.status}, switching to fallback proxy.`);
       return await fetch(`${fallbackBase}${cleanPath}`, baseFetchOptions);
     }
     return res;
@@ -98,7 +98,7 @@ export async function apiFetch(path, options = {}) {
     if (timer) clearTimeout(timer);
     if (canFallback) {
       primaryDownUntil = Date.now() + PRIMARY_COOLDOWN_MS;
-      console.warn(`[apiFetch] Primary (${primaryBase}) failed, retrying with fallback (${fallbackBase}):`, primaryErr);
+      console.warn('[apiFetch] Primary API unreachable, switching to fallback proxy.');
       return await fetch(`${fallbackBase}${cleanPath}`, baseFetchOptions);
     }
     throw primaryErr;

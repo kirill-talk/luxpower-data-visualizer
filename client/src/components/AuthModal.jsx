@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Lock, User, Key, Server, CheckCircle2, AlertCircle, LogOut, Globe } from 'lucide-react';
 import { translations } from '../utils/i18n';
-import { getApiBaseUrl, setCustomApiUrl, apiFetch } from '../utils/config';
+import { setCustomApiUrl, apiFetch } from '../utils/config';
 
 /**
  * AuthModal
@@ -28,13 +28,7 @@ export default function AuthModal({
       return '';
     }
   });
-  const [showAdvanced, setShowAdvanced] = useState(() => {
-    try {
-      return !!localStorage.getItem('luxpower-custom-api-url');
-    } catch {
-      return false;
-    }
-  });
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [apiSavedMsg, setApiSavedMsg] = useState(null);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -244,7 +238,7 @@ export default function AuthModal({
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">
-                      {apiSavedMsg || `${lang === 'en' ? 'Active' : 'Активний'}: ${getApiBaseUrl()}`}
+                      {apiSavedMsg || ''}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {apiUrl.trim() && (
