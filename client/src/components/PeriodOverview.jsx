@@ -373,7 +373,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
                 <Coins className="w-3.5 h-3.5" />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                {isEn ? 'Electricity Cost (2-zone)' : 'Вартість електроенергії (2 зони)'}
+                {isEn ? 'Cost' : 'Вартість'}
               </span>
             </div>
             <div className="font-mono text-xs text-slate-500 dark:text-slate-400">

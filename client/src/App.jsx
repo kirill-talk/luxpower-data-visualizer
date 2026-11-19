@@ -812,7 +812,7 @@ export default function App() {
       {/* TOP APP HEADER & MAIN CONTENT WRAPPER */}
       <div className="lg:pl-64">
         {/* TOP HEADER */}
-        <header className="fixed top-0 left-0 lg:left-64 right-0 min-h-16 bg-white/85 dark:bg-[#0a0e17]/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08] z-40 px-3 sm:px-6 py-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2 transition-colors duration-200">
+        <header className="fixed top-0 left-0 lg:left-64 right-0 bg-white/85 dark:bg-[#0a0e17]/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08] z-40 px-3 sm:px-6 py-2.5 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 transition-colors duration-200">
           {/* Identity & Status: In single row on mobile (GRID, LAN, Update Time) */}
           <div className="flex items-center justify-between gap-2 min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
@@ -973,7 +973,7 @@ export default function App() {
         </header>
 
         {/* MAIN CONTENT AREA */}
-        <main className="relative pt-[112px] lg:pt-20 min-h-screen px-3 sm:px-6 py-4 sm:py-6 pb-20 transition-colors duration-200">
+        <main className="relative pt-[104px] lg:pt-[76px] min-h-screen px-3 sm:px-6 py-4 sm:py-6 pb-20 transition-colors duration-200">
           <div className="flex flex-col gap-6 max-w-[1600px] mx-auto">
             {/* TAB 1: DASHBOARD (KPI, Потоки енергії, Баланс потужності, Журнал внизу) */}
             {activeTab === 'dashboard' && (
@@ -1277,12 +1277,12 @@ export default function App() {
                           <Battery className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                           {t.batteryKwh}
                         </span>
-                        <div className="flex flex-col md:flex-row md:items-baseline gap-0.5 md:gap-1.5 mt-0.5 font-mono font-semibold">
-                          <span className="text-emerald-600 dark:text-emerald-400 text-lg md:text-xl font-bold font-tabular">
-                            +{rangeEnergyStats.batteryChargeKwh} <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400 md:hidden">{unitKwh}</span>
+                        <div className="flex flex-col gap-0.5 mt-0.5 font-mono font-semibold">
+                          <span className="text-emerald-600 dark:text-emerald-400 text-base sm:text-lg font-bold font-tabular">
+                            +{rangeEnergyStats.batteryChargeKwh} <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">{unitKwh}</span>
                           </span>
-                          <span className="text-rose-500 dark:text-rose-400 text-lg md:text-xl font-bold font-tabular">
-                            -{rangeEnergyStats.batteryDischargeKwh} <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">{unitKwh}</span>
+                          <span className="text-rose-500 dark:text-rose-400 text-base sm:text-lg font-bold font-tabular">
+                            -{rangeEnergyStats.batteryDischargeKwh} <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">{unitKwh}</span>
                           </span>
                         </div>
                       </div>
@@ -1439,7 +1439,7 @@ export default function App() {
                           <Home className="w-4 h-4" />
                         </div>
                         <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                          {t.secPowerFlowTitle} ({formatDateHuman(selectedDate, lang)})
+                          {t.secPowerFlowTitle}
                         </h3>
                       </div>
                       <span className="text-xs font-mono text-slate-400">
@@ -1594,10 +1594,10 @@ export default function App() {
                       <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                         {t.avgRadiators}
                       </span>
-                      <div className="flex items-baseline gap-1.5 mt-0.5 font-mono font-bold">
-                        <span className="text-rose-600 dark:text-rose-400 text-xl font-tabular">{gridAverages.avgTrad1}°C</span>
-                        <span className="text-slate-300 dark:text-slate-600">/</span>
-                        <span className="text-rose-600 dark:text-rose-400 text-xl font-tabular">{gridAverages.avgTrad2}°C</span>
+                      <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-1.5 mt-0.5 font-mono font-bold">
+                        <span className="text-rose-600 dark:text-rose-400 text-lg sm:text-xl font-tabular">{gridAverages.avgTrad1}°C</span>
+                        <span className="hidden sm:inline text-slate-300 dark:text-slate-600">/</span>
+                        <span className="text-rose-600 dark:text-rose-400 text-lg sm:text-xl font-tabular">{gridAverages.avgTrad2}°C</span>
                       </div>
                     </div>
                   </div>
