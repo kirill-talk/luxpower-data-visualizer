@@ -973,7 +973,7 @@ export default function App() {
         </header>
 
         {/* MAIN CONTENT AREA */}
-        <main className="relative pt-[112px] sm:pt-20 min-h-screen px-3 sm:px-6 py-4 sm:py-6 pb-20 transition-colors duration-200">
+        <main className="relative pt-[112px] lg:pt-20 min-h-screen px-3 sm:px-6 py-4 sm:py-6 pb-20 transition-colors duration-200">
           <div className="flex flex-col gap-6 max-w-[1600px] mx-auto">
             {/* TAB 1: DASHBOARD (KPI, Потоки енергії, Баланс потужності, Журнал внизу) */}
             {activeTab === 'dashboard' && (
@@ -1236,10 +1236,16 @@ export default function App() {
                       <div className="flex flex-col">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          {t.period}: {rangeStartTime || '00:00'} - {rangeEndTime || '24:00'}
+                          {t.period}
                         </span>
-                        <span className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 mt-1">
-                          ({rangeEnergyStats.durationHours} {t.hours})
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                          <span className="font-mono text-xl font-bold text-slate-700 dark:text-slate-200 font-tabular">
+                            {rangeEnergyStats.durationHours}
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">{t.hours}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
+                          {rangeStartTime || '00:00'} - {rangeEndTime || '24:00'}
                         </span>
                       </div>
                       <div className="flex flex-col">
@@ -1271,14 +1277,13 @@ export default function App() {
                           <Battery className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                           {t.batteryKwh}
                         </span>
-                        <div className="flex items-baseline gap-1.5 mt-0.5 font-mono font-semibold">
-                          <span className="text-emerald-600 dark:text-emerald-400 text-lg font-tabular">
-                            +{rangeEnergyStats.batteryChargeKwh}
+                        <div className="flex flex-col md:flex-row md:items-baseline gap-0.5 md:gap-1.5 mt-0.5 font-mono font-semibold">
+                          <span className="text-emerald-600 dark:text-emerald-400 text-lg md:text-xl font-bold font-tabular">
+                            +{rangeEnergyStats.batteryChargeKwh} <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400 md:hidden">{unitKwh}</span>
                           </span>
-                          <span className="text-rose-500 dark:text-rose-400 text-lg font-tabular">
-                            -{rangeEnergyStats.batteryDischargeKwh}
+                          <span className="text-rose-500 dark:text-rose-400 text-lg md:text-xl font-bold font-tabular">
+                            -{rangeEnergyStats.batteryDischargeKwh} <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">{unitKwh}</span>
                           </span>
-                          <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">{unitKwh}</span>
                         </div>
                       </div>
                       <div className="flex flex-col">

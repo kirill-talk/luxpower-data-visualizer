@@ -52,7 +52,7 @@ export const translations = {
 
     // Section 1: Power Flow
     secPowerFlowTitle: 'Power Balance',
-    secPowerFlowSub: '6 min step • Select range to calculate kWh sum',
+    secPowerFlowSub: 'Select range to calculate kWh sum',
     diagramActiveBypass: 'ACTIVE BYPASS',
     diagramEps: 'BACKUP (EPS)',
     diagramTitle: 'Power Flow Diagram',
@@ -69,7 +69,7 @@ export const translations = {
     gridImportKwh: 'Grid Import',
     homeLoadKwh: 'Home Load',
     batteryKwh: 'Battery',
-    inverterLossKwh: 'Inverter Consumption',
+    inverterLossKwh: 'Inverter',
 
     // Chart Series
     seriesImport: 'Import',
@@ -229,7 +229,7 @@ export const translations = {
 
     // Section 1: Power Flow
     secPowerFlowTitle: 'Баланс потужності',
-    secPowerFlowSub: 'Крок 6 хв • Виділяйте відрізок для суми кВт·год',
+    secPowerFlowSub: 'Виділяйте відрізок для суми кВт·год',
     diagramActiveBypass: 'АКТИВНИЙ БАЙПАС',
     diagramEps: 'АВТОНОМІЯ (EPS)',
     diagramTitle: 'Діаграма потоків потужності',
@@ -246,7 +246,7 @@ export const translations = {
     gridImportKwh: 'Імпорт з мережі',
     homeLoadKwh: 'Спожито домом',
     batteryKwh: 'Батарея',
-    inverterLossKwh: 'Споживання інвертора',
+    inverterLossKwh: 'Інвертор',
 
     // Chart Series
     seriesImport: 'Імпорт',
