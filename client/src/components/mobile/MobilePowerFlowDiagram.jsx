@@ -42,6 +42,7 @@ export default function MobilePowerFlowDiagram({
   const unitW = isEn ? 'W' : 'Вт';
   const unitV = isEn ? 'V' : 'В';
   const unitHz = isEn ? 'Hz' : 'Гц';
+  const unitKwh = isEn ? 'kWh' : 'кВт·год';
 
   const {
     model: batteryModel = '2× Dyness B4850',
@@ -51,7 +52,11 @@ export default function MobilePowerFlowDiagram({
     bat1Soh = '99.1',
     bat2Soh = '99.6',
     avgSoh = '99.3',
+    bat1Kwh = 415.3,
+    bat2Kwh = 157.8,
   } = batteryHealth || {};
+
+  const batteryTitleTooltip = `B1 (11.2025): ${bat1Soh}% (${bat1Kwh} ${unitKwh})\nB2 (02.2026): ${bat2Soh}% (${bat2Kwh} ${unitKwh})`;
 
   const isCharging = batteryPower > 0;
   const isDischarging = batteryPower < 0;
@@ -206,12 +211,21 @@ export default function MobilePowerFlowDiagram({
                 )}
               </div>
               <div className="flex flex-col">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  {isEn ? 'Battery' : 'Акумулятор'}{' '}
-                  <span className="font-mono text-[10px] font-semibold text-slate-400">
-                    ({batteryModel})
+                <div
+                  className="relative group/batTitle cursor-help"
+                  title={batteryTitleTooltip}
+                >
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    {isEn ? 'Battery' : 'Акумулятор'}{' '}
+                    <span className="font-mono text-[10px] font-semibold text-slate-400">
+                      ({batteryModel})
+                    </span>
                   </span>
-                </span>
+                  <div className="pointer-events-none opacity-0 group-hover/batTitle:opacity-100 transition-opacity duration-150 absolute left-0 bottom-full mb-1.5 z-50 w-max max-w-xs rounded-lg bg-slate-900 dark:bg-slate-800 text-white border border-slate-700/80 shadow-xl px-2.5 py-1.5 text-[10px] font-mono leading-relaxed">
+                    <div>B1 (11.2025): {bat1Soh}% ({bat1Kwh} {unitKwh})</div>
+                    <div>B2 (02.2026): {bat2Soh}% ({bat2Kwh} {unitKwh})</div>
+                  </div>
+                </div>
                 <span className="text-[10px] font-mono text-slate-400">
                   {batteryVoltage} {unitV} • {isCharging ? `+${batteryCurrent}` : isDischarging ? `-${batteryCurrent}` : '0.0'} A
                 </span>

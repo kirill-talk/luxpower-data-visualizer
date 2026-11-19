@@ -47,6 +47,7 @@ export default function PowerFlowDiagram({
   const unitW = isEn ? 'W' : 'Вт';
   const unitV = isEn ? 'V' : 'В';
   const unitHz = isEn ? 'Hz' : 'Гц';
+  const unitKwh = isEn ? 'kWh' : 'кВт·год';
 
   const {
     model: batteryModel = '2× Dyness B4850',
@@ -59,6 +60,8 @@ export default function PowerFlowDiagram({
     bat1Kwh = 415.3,
     bat2Kwh = 157.8,
   } = batteryHealth || {};
+
+  const batteryTitleTooltip = `B1 (11.2025): ${bat1Soh}% (${bat1Kwh} ${unitKwh})\nB2 (02.2026): ${bat2Soh}% (${bat2Kwh} ${unitKwh})`;
 
   const isCharging = batteryPower > 0;
   const isDischarging = batteryPower < 0;
@@ -604,12 +607,21 @@ export default function PowerFlowDiagram({
                   <Battery className="w-4 h-4 sm:w-6 sm:h-6" />
                 )}
               </div>
-              <div className="flex flex-col flex-1">
+              <div className="flex flex-col flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 truncate">
-                    {isEn ? 'Battery' : 'Акумулятор'}
-                    <span className="hidden sm:inline"> ({batteryModel})</span>
-                  </span>
+                  <div
+                    className="relative group/batTitle min-w-0 cursor-help"
+                    title={batteryTitleTooltip}
+                  >
+                    <span className="block text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 truncate">
+                      {isEn ? 'Battery' : 'Акумулятор'}
+                      <span className="hidden sm:inline"> ({batteryModel})</span>
+                    </span>
+                    <div className="pointer-events-none opacity-0 group-hover/batTitle:opacity-100 transition-opacity duration-150 absolute left-0 bottom-full mb-2 z-50 w-max max-w-xs rounded-lg bg-slate-900 dark:bg-slate-800 text-white border border-slate-700/80 shadow-xl px-2.5 py-1.5 text-[10px] font-mono leading-relaxed">
+                      <div>B1 (11.2025): {bat1Soh}% ({bat1Kwh} {unitKwh})</div>
+                      <div>B2 (02.2026): {bat2Soh}% ({bat2Kwh} {unitKwh})</div>
+                    </div>
+                  </div>
                   <span className={`px-1.5 py-0.2 rounded text-[8px] sm:text-[9px] font-mono font-semibold border shrink-0 ${
                     isCharging
                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
@@ -657,10 +669,6 @@ export default function PowerFlowDiagram({
                   >
                     SOH: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{avgSoh}%</strong>
                   </span>
-                </div>
-                <div className="hidden sm:flex items-center justify-between gap-2 text-[9px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
-                  <span>B1 (11.2025): {bat1Soh}% ({bat1Kwh} {isEn ? 'kWh' : 'кВт·год'})</span>
-                  <span>B2 (02.2026): {bat2Soh}% ({bat2Kwh} {isEn ? 'kWh' : 'кВт·год'})</span>
                 </div>
               </div>
             </div>
