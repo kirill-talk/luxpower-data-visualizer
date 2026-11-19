@@ -8,8 +8,8 @@ This document provides essential context, architecture details, and runtime envi
 
 | Environment | URL / Endpoint | Purpose / Description |
 | :--- | :--- | :--- |
-| **Dev Server (Self-hosted)** | `https://data-visualizer.kidev.uk/` | Self-hosted live environment managed via Docker Compose and Traefik reverse proxy. |
-| **Dev API Base URL** | `https://data-visualizer.kidev.uk/api` | Direct API endpoint on the dev server for telemetry, authentication, and status. |
+| **Dev Server (Self-hosted)** | `https://<APP_DOMAIN>/` | Self-hosted live environment managed via Docker Compose and Traefik reverse proxy (configured in `.env`). |
+| **Dev API Base URL** | `https://<APP_DOMAIN>/api` | Direct API endpoint on the dev server for telemetry, authentication, and status. |
 | **GitHub Pages (Production)** | `https://kirill-talk.github.io/luxpower-data-visualizer/` | Static SPA frontend deployed automatically via GitHub Actions from `main`. |
 | **Cloudflare Worker Proxy** | `https://luxpower-proxy.kirill-talk.workers.dev/api` | Serverless CORS proxy used by GitHub Pages to interact directly with Luxpowertek Cloud. |
 | **Local Docker Port** | `http://localhost:3001` | Local containerized backend server (`compose.yaml`). |

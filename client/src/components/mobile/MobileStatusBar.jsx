@@ -11,7 +11,7 @@ import { translations } from '../../utils/i18n';
  * - 6-min Countdown badge & quick refresh button
  */
 export default function MobileStatusBar({
-  serialNumber = '4363800631',
+  serialNumber = '—',
   lastUpdated,
   selectedDate,
   onDateChange,

@@ -14,7 +14,7 @@ services:
       - web
     labels:
       - 'traefik.enable=true'
-      - 'traefik.http.routers.data-visualizer.rule=Host(`data-visualizer.test`) || Host(`data-visualizer.kidev.uk`)'
+      - 'traefik.http.routers.data-visualizer.rule=Host(`data-visualizer.test`) || Host(`${APP_DOMAIN:-localhost}`)'
       - 'traefik.http.routers.data-visualizer.entrypoints=web'
       - 'traefik.http.services.data-visualizer.loadbalancer.server.port=3001'
 

@@ -14,6 +14,7 @@ export default function AuthModal({
   authStatus,
   onLoginSuccess,
   onLogout,
+  onApiUrlSaved,
   lang = 'uk'
 }) {
   const t = translations[lang] || translations.uk;
@@ -27,7 +28,14 @@ export default function AuthModal({
       return '';
     }
   });
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(() => {
+    try {
+      return !!localStorage.getItem('luxpower-custom-api-url');
+    } catch {
+      return false;
+    }
+  });
+  const [apiSavedMsg, setApiSavedMsg] = useState(null);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -60,9 +68,9 @@ export default function AuthModal({
           }),
         });
       } catch (fetchErr) {
-        // If primary Cloudflare Worker fetch fails (DNS/blocked/CORS), try fallback dev API
-        const fallbackBase = 'https://data-visualizer.kidev.uk/api';
-        if (endpointBase !== fallbackBase) {
+        // If primary Cloudflare Worker fetch fails (DNS/blocked/CORS), try fallback API if configured
+        const fallbackBase = import.meta.env.VITE_FALLBACK_API_URL || import.meta.env.VITE_API_BASE_URL || '/api';
+        if (fallbackBase && endpointBase !== fallbackBase) {
           console.warn(`Primary proxy (${endpointBase}) failed, trying fallback (${fallbackBase}):`, fetchErr);
           res = await fetch(`${fallbackBase}/auth/login`, {
             method: 'POST',
@@ -235,21 +243,57 @@ export default function AuthModal({
               </button>
 
               {showAdvanced && (
-                <div className="p-3 rounded-xl bg-slate-100/70 dark:bg-[#0c121e]/80 border border-slate-200 dark:border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3 rounded-xl bg-slate-100/70 dark:bg-[#0c121e]/80 border border-slate-200 dark:border-white/[0.06] flex flex-col gap-2">
                   <span className="text-[10px] text-slate-500 dark:text-slate-400">
                     {lang === 'en'
-                      ? 'Point to your Cloudflare Worker URL (e.g. https://luxpower-proxy.xxx.workers.dev). Leave empty for default.'
-                      : 'Вкажіть URL вашого Cloudflare Worker (наприклад https://luxpower-proxy.xxx.workers.dev). Залиште порожнім за замовчуванням.'}
+                      ? 'Point to your self-hosted API / Cloudflare Worker URL (e.g. https://your-server.example/api). Leave empty for default.'
+                      : 'Вкажіть URL вашого сервера або Cloudflare Worker (наприклад https://your-server.example/api). Залиште порожнім за замовчуванням.'}
                   </span>
-                  <div className="relative mt-1">
+                  <div className="relative">
                     <Globe className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="url"
                       value={apiUrl}
-                      onChange={(e) => setApiUrl(e.target.value)}
-                      placeholder="https://luxpower-proxy.example.workers.dev"
+                      onChange={(e) => {
+                        setApiUrl(e.target.value);
+                        setApiSavedMsg(null);
+                      }}
+                      placeholder="https://your-server.example/api"
                       className="w-full bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-white/[0.08] rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
                     />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">
+                      {apiSavedMsg || `${lang === 'en' ? 'Active' : 'Активний'}: ${getApiBaseUrl()}`}
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {apiUrl.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setApiUrl('');
+                            setCustomApiUrl('');
+                            setApiSavedMsg(lang === 'en' ? 'Reset to default' : 'Скинуто');
+                            if (onApiUrlSaved) onApiUrlSaved('');
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-white/[0.05] border border-slate-200 dark:border-white/[0.08] hover:bg-slate-50 dark:hover:bg-white/[0.1] transition-colors"
+                        >
+                          {lang === 'en' ? 'Reset' : 'Скинути'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomApiUrl(apiUrl);
+                          setApiSavedMsg(lang === 'en' ? 'API URL saved' : 'API URL збережено');
+                          if (onApiUrlSaved) onApiUrlSaved(apiUrl.trim());
+                          onClose();
+                        }}
+                        className="px-3 py-1 rounded-lg text-[11px] font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-colors"
+                      >
+                        {lang === 'en' ? 'Save API URL' : 'Зберегти API URL'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

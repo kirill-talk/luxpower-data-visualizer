@@ -459,8 +459,8 @@ export function calculateBatteryHealth(latestRow, liveData) {
   const RATED_CYCLES_TO_80_SOH = 6000;
   const CALENDAR_AGING_PER_YEAR = 0.3;
 
-  const parsedDisChg = parseFloat(latestRow?.eDisChgAll);
-  const parsedChg = parseFloat(latestRow?.eChgAll);
+  const parsedDisChg = parseFloat(liveData?.eDisChgAll ?? latestRow?.eDisChgAll);
+  const parsedChg = parseFloat(liveData?.eChgAll ?? latestRow?.eChgAll);
   const totalDisChgKwh = Number.isFinite(parsedDisChg) && parsedDisChg > 0 ? parsedDisChg : 573.0;
   const totalChgKwh = Number.isFinite(parsedChg) && parsedChg > 0 ? parsedChg : 533.1;
 
@@ -474,7 +474,7 @@ export function calculateBatteryHealth(latestRow, liveData) {
   const bat2Cycles = Math.round(bat2Kwh / NOMINAL_MODULE_KWH);
   const avgCycles = Math.round((bat1Cycles + bat2Cycles) / 2);
 
-  const refTimeStr = latestRow?.time || liveData?.deviceTime;
+  const refTimeStr = liveData?.deviceTime || latestRow?.time;
   const parsedRefMs = refTimeStr ? new Date(String(refTimeStr).replace(/-/g, '/')).getTime() : Date.now();
   const refMs = Number.isFinite(parsedRefMs) ? parsedRefMs : Date.now();
 

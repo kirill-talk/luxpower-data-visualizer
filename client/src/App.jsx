@@ -537,6 +537,32 @@ export default function App() {
     };
   }, [autoRefresh]);
 
+  // 15-second live polling for real-time dongle / inverter telemetry
+  const fetchLiveRef = useRef(fetchLive);
+  fetchLiveRef.current = fetchLive;
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const liveInterval = setInterval(() => {
+      if (document.visibilityState === 'visible' && fetchLiveRef.current) {
+        fetchLiveRef.current();
+      }
+    }, 15000);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && fetchLiveRef.current) {
+        fetchLiveRef.current();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(liveInterval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [autoRefresh]);
+
   // Day navigation handlers
   const handlePrevDay = () => {
     const [y, m, d] = selectedDate.split('-').map(Number);
@@ -606,11 +632,16 @@ export default function App() {
     return Math.max(0, Math.round(input - output));
   }, [gridImport, battDischarge, homeLoad, battCharge]);
 
-  // Counters
-  const dailyGridImport = latestRow ? latestRow.eToUserDay : '0';
-  const dailyChg = latestRow ? latestRow.eChgDay : '0';
-  const dailyDisChg = latestRow ? latestRow.eDisChgDay : '0';
-  const dailyHomeCons = latestRow ? latestRow.eEpsDay : '0';
+  // Counters (prefer real-time dongle values in liveData when present, else latestRow)
+  const dailyGridImport = liveData?.eToUserDay ?? latestRow?.eToUserDay ?? '0';
+  const dailyChg = liveData?.eChgDay ?? latestRow?.eChgDay ?? '0';
+  const dailyDisChg = liveData?.eDisChgDay ?? latestRow?.eDisChgDay ?? '0';
+  const dailyHomeCons = liveData?.eEpsDay ?? latestRow?.eEpsDay ?? '0';
+  const dataSource = liveData?.source || status?.dataSource || (status?.connected ? 'cloud' : null);
+  const liveInverterTemp = liveData?.tinner ?? latestRow?.tinner;
+  const liveBatteryVoltage = liveData?.vBat
+    ? (Number(liveData.vBat) / 10).toFixed(1)
+    : (latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : '50.1');
 
   // Power source durations (battery vs grid streak, estimated remaining runtime and 24h totals)
   const powerSourceDurations = useMemo(() => {
@@ -849,9 +880,24 @@ export default function App() {
                       {gridEpsInfo.isGridOnline ? t.grid220 : 'EPS'}
                     </span>
                   </div>
+                  {dataSource && (
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-mono font-semibold ${
+                        dataSource === 'dongle'
+                          ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400'
+                          : 'bg-slate-100 dark:bg-white/[0.06] border-slate-200 dark:border-white/[0.1] text-slate-500 dark:text-slate-400'
+                      }`}
+                      title={dataSource === 'dongle'
+                        ? (lang === 'en' ? 'Live telemetry directly from LAN Wi-Fi dongle (Read-Only)' : 'Жива телеметрія напряму з LAN-донгла (Read-Only)')
+                        : (lang === 'en' ? 'Telemetry from Luxpower Cloud' : 'Телеметрія з хмари Luxpower')}
+                    >
+                      <Radio className="w-2.5 h-2.5" />
+                      <span>{dataSource === 'dongle' ? 'LAN Dongle' : 'Cloud'}</span>
+                    </span>
+                  )}
                 </div>
                 <div className="text-[10px] sm:text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 truncate">
-                  <span>SN: <strong className="font-semibold text-slate-700 dark:text-slate-200">{status?.defaultSerial || '4363800631'}</strong></span>
+                  <span>SN: <strong className="font-semibold text-slate-700 dark:text-slate-200">{status?.defaultSerial || '—'}</strong></span>
                   <span className="text-slate-300 dark:text-slate-600">•</span>
                   <span>SNA 6K</span>
                   {lastUpdated && (
@@ -999,7 +1045,7 @@ export default function App() {
             {/* MOBILE ONLY (< xl / < 1200px): QUICK STATUS BAR, KPI & COMPACT POWER FLOW */}
             <div className="flex flex-col gap-4 xl:hidden">
               <MobileStatusBar
-                serialNumber={status?.defaultSerial || '4363800631'}
+                serialNumber={status?.defaultSerial || '—'}
                 lastUpdated={lastUpdated}
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
@@ -1036,7 +1082,7 @@ export default function App() {
                 gridFrequency={gridEpsInfo.frequency}
                 dailyGridImport={dailyGridImport}
                 currentInverterLoss={currentInverterLoss}
-                inverterTemp={latestRow?.tinner ?? '--'}
+                inverterTemp={liveInverterTemp ?? '--'}
                 lang={lang}
               />
 
@@ -1052,8 +1098,8 @@ export default function App() {
                 gridFrequency={gridEpsInfo.frequency}
                 isGridOnline={gridEpsInfo.isGridOnline}
                 isEpsActive={!gridEpsInfo.isGridOnline}
-                inverterTemp={latestRow?.tinner ?? '28.0'}
-                batteryVoltage={latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : (liveData?.vBat ? (liveData.vBat / 10).toFixed(1) : '50.1')}
+                inverterTemp={liveInverterTemp ?? '28.0'}
+                batteryVoltage={liveBatteryVoltage}
                 batteryCurrent={batteryCurrent}
                 batteryHealth={batteryHealth}
                 loadPercent={latestRow?.loadPercent ?? '4.6'}
@@ -1221,7 +1267,7 @@ export default function App() {
                 <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3">
                   <div className="flex items-center gap-1 text-purple-500 dark:text-purple-400 font-semibold">
                     <Flame className="w-3.5 h-3.5 text-purple-500" />
-                    <span>{latestRow ? `${latestRow.tinner}°C` : '--'}</span>
+                    <span>{liveInverterTemp !== undefined ? `${liveInverterTemp}°C` : '--'}</span>
                   </div>
                   <span className="text-slate-500 dark:text-slate-400">
                     {gridEpsInfo.isGridOnline ? t.bypassCharging : t.epsMode}
@@ -1246,8 +1292,8 @@ export default function App() {
                     gridFrequency={gridEpsInfo.frequency}
                     isGridOnline={gridEpsInfo.isGridOnline}
                     isEpsActive={!gridEpsInfo.isGridOnline}
-                    inverterTemp={latestRow?.tinner ?? '28.0'}
-                    batteryVoltage={latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : (liveData?.vBat ? (liveData.vBat / 10).toFixed(1) : '50.1')}
+                    inverterTemp={liveInverterTemp ?? '28.0'}
+                    batteryVoltage={liveBatteryVoltage}
                     batteryCurrent={batteryCurrent}
                     batteryHealth={batteryHealth}
                     loadPercent={latestRow?.loadPercent ?? '4.6'}
@@ -1664,6 +1710,11 @@ export default function App() {
         }}
         onLoginSuccess={handleLoginSuccess}
         onLogout={handleLogout}
+        onApiUrlSaved={() => {
+          fetchStatus();
+          fetchLive();
+          fetchHistory(selectedDate);
+        }}
         lang={lang}
       />
     </div>
