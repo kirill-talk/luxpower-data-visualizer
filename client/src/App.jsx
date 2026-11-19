@@ -461,10 +461,6 @@ export default function App() {
     }
   }, [selectedDate, periodMode, customRange?.start, customRange?.end]);
 
-  // Keep latest ref so timer interval doesn't need to re-bind or recreate
-  const refreshFnRef = useRef(handleManualRefresh);
-  refreshFnRef.current = handleManualRefresh;
-
   // 6-minute (360s) Auto-refresh timer with timestamp tracking
   // Tracks elapsed wall-clock time so background tab throttling doesn't stall refresh
   const targetRefreshTimeRef = useRef(Date.now() + 360 * 1000);
@@ -491,6 +487,10 @@ export default function App() {
       fetchPeriodHistory(dates);
     }
   };
+
+  // Keep latest ref so timer interval doesn't need to re-bind or recreate
+  const refreshFnRef = useRef(handleManualRefresh);
+  refreshFnRef.current = handleManualRefresh;
 
   useEffect(() => {
     if (!autoRefresh) {
