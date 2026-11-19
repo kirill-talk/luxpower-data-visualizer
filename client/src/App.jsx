@@ -982,7 +982,7 @@ export default function App() {
         </header>
 
         {/* MAIN CONTENT AREA */}
-        <main className="relative pt-[112px] lg:pt-[76px] min-h-screen px-3 sm:px-6 py-4 sm:py-6 pb-20 transition-colors duration-200">
+        <main className="relative pt-[112px] lg:pt-[76px] min-h-screen px-3 sm:px-6 pb-20 transition-colors duration-200">
           <div className="flex flex-col gap-6 max-w-[1600px] mx-auto">
             {/* TAB 1: DASHBOARD (KPI, Потоки енергії, Баланс потужності, Журнал внизу) */}
             {activeTab === 'dashboard' && (
