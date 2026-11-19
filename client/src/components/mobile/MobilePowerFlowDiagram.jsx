@@ -34,6 +34,7 @@ export default function MobilePowerFlowDiagram({
   inverterTemp = '28.0',
   batteryVoltage = '50.1',
   batteryCurrent = '0.0',
+  batteryHealth = null,
   loadPercent = '4.6',
   lang = 'uk'
 }) {
@@ -41,6 +42,16 @@ export default function MobilePowerFlowDiagram({
   const unitW = isEn ? 'W' : 'Вт';
   const unitV = isEn ? 'V' : 'В';
   const unitHz = isEn ? 'Hz' : 'Гц';
+
+  const {
+    model: batteryModel = '2× Dyness B4850',
+    bat1Cycles = 173,
+    bat2Cycles = 66,
+    avgCycles = 120,
+    bat1Soh = '99.1',
+    bat2Soh = '99.6',
+    avgSoh = '99.3',
+  } = batteryHealth || {};
 
   const isCharging = batteryPower > 0;
   const isDischarging = batteryPower < 0;
@@ -196,10 +207,13 @@ export default function MobilePowerFlowDiagram({
               </div>
               <div className="flex flex-col">
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  {isEn ? 'Battery' : 'Акумулятор'}
+                  {isEn ? 'Battery' : 'Акумулятор'}{' '}
+                  <span className="font-mono text-[10px] font-semibold text-slate-400">
+                    ({batteryModel})
+                  </span>
                 </span>
                 <span className="text-[10px] font-mono text-slate-400">
-                  {batteryVoltage} {unitV} • {batteryCurrent} A
+                  {batteryVoltage} {unitV} • {isCharging ? `+${batteryCurrent}` : isDischarging ? `-${batteryCurrent}` : '0.0'} A
                 </span>
               </div>
             </div>
@@ -243,6 +257,16 @@ export default function MobilePowerFlowDiagram({
                 <span>{isEn ? 'Standby' : 'У спокої'}</span>
               )}
             </div>
+          </div>
+
+          <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-200/40 dark:border-white/[0.04] text-[10px] font-mono text-slate-500 dark:text-slate-400">
+            <span title={isEn ? `Avg: ${avgCycles} cycles` : `Сер.: ${avgCycles} циклів`}>
+              B1: <strong className="text-slate-700 dark:text-slate-200">{bat1Cycles}</strong> / B2: <strong className="text-slate-700 dark:text-slate-200">{bat2Cycles}</strong> {isEn ? 'cycles' : 'циклів'}
+            </span>
+            <span title={`B1: ${bat1Soh}% • B2: ${bat2Soh}%`}>
+              SOH: <strong className="text-slate-700 dark:text-slate-200">{avgSoh}%</strong>{' '}
+              <span className="text-[9px] text-slate-400">({bat1Soh}% / {bat2Soh}%)</span>
+            </span>
           </div>
         </div>
       </div>

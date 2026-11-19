@@ -52,6 +52,7 @@ import {
   normalizeGridAndEps,
   calculatePowerSourceDurations,
   calculateTimeToFullCharge,
+  calculateBatteryHealth,
   formatDurationHuman
 } from './utils/energyMath';
 
@@ -621,6 +622,29 @@ export default function App() {
     return calculateTimeToFullCharge(soc, battCharge);
   }, [soc, battCharge]);
 
+  // Dynamic battery cycle count and SOH estimation for 2× Dyness B4850
+  const batteryHealth = useMemo(() => {
+    return calculateBatteryHealth(latestRow, liveData);
+  }, [latestRow, liveData]);
+
+  // Real-time battery current (A): liveData.bmsBatCurrent is scaled x100, table bmsBatCurrent is x1
+  const batteryCurrent = useMemo(() => {
+    const liveCurr = liveData?.bmsBatCurrent !== undefined ? Number(liveData.bmsBatCurrent) / 100 : 0;
+    if (liveCurr !== 0 && !Number.isNaN(liveCurr)) {
+      return Math.abs(liveCurr).toFixed(1);
+    }
+    if (battCharge > 0 || battDischarge > 0) {
+      const p = battCharge > 0 ? battCharge : battDischarge;
+      const v = parseFloat(latestRow?.vBat) || (liveData?.vBat ? liveData.vBat / 10 : 50);
+      return (p / v).toFixed(1);
+    }
+    const rowCurr = latestRow?.bmsBatCurrent !== undefined ? parseFloat(latestRow.bmsBatCurrent) : 0;
+    if (rowCurr !== 0 && !Number.isNaN(rowCurr)) {
+      return Math.abs(rowCurr).toFixed(1);
+    }
+    return '0.0';
+  }, [liveData, latestRow, battCharge, battDischarge]);
+
   // Real-time ticking seconds for current streak timer
   const [currentUptimeSec, setCurrentUptimeSec] = useState(0);
 
@@ -1029,8 +1053,9 @@ export default function App() {
                 isGridOnline={gridEpsInfo.isGridOnline}
                 isEpsActive={!gridEpsInfo.isGridOnline}
                 inverterTemp={latestRow?.tinner ?? '28.0'}
-                batteryVoltage={latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : '50.1'}
-                batteryCurrent={latestRow?.bmsBatCurrent ? Math.abs(Number(latestRow.bmsBatCurrent)).toFixed(1) : (battCharge > 0 ? (battCharge / 50).toFixed(1) : '0.0')}
+                batteryVoltage={latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : (liveData?.vBat ? (liveData.vBat / 10).toFixed(1) : '50.1')}
+                batteryCurrent={batteryCurrent}
+                batteryHealth={batteryHealth}
                 loadPercent={latestRow?.loadPercent ?? '4.6'}
                 lang={lang}
               />
@@ -1222,8 +1247,9 @@ export default function App() {
                     isGridOnline={gridEpsInfo.isGridOnline}
                     isEpsActive={!gridEpsInfo.isGridOnline}
                     inverterTemp={latestRow?.tinner ?? '28.0'}
-                    batteryVoltage={latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : '50.1'}
-                    batteryCurrent={latestRow?.bmsBatCurrent ? Math.abs(Number(latestRow.bmsBatCurrent)).toFixed(1) : (battCharge > 0 ? (battCharge / 50).toFixed(1) : '0.0')}
+                    batteryVoltage={latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : (liveData?.vBat ? (liveData.vBat / 10).toFixed(1) : '50.1')}
+                    batteryCurrent={batteryCurrent}
+                    batteryHealth={batteryHealth}
                     loadPercent={latestRow?.loadPercent ?? '4.6'}
                     lang={lang}
                   />

@@ -38,6 +38,7 @@ export default function PowerFlowDiagram({
   inverterTemp = '28.0',
   batteryVoltage = '50.1',
   batteryCurrent = '20.1',
+  batteryHealth = null,
   loadPercent = '4.6',
   lang = 'uk',
 }) {
@@ -46,6 +47,18 @@ export default function PowerFlowDiagram({
   const unitW = isEn ? 'W' : 'Вт';
   const unitV = isEn ? 'V' : 'В';
   const unitHz = isEn ? 'Hz' : 'Гц';
+
+  const {
+    model: batteryModel = '2× Dyness B4850',
+    bat1Cycles = 173,
+    bat2Cycles = 66,
+    avgCycles = 120,
+    bat1Soh = '99.1',
+    bat2Soh = '99.6',
+    avgSoh = '99.3',
+    bat1Kwh = 415.3,
+    bat2Kwh = 157.8,
+  } = batteryHealth || {};
 
   const isCharging = batteryPower > 0;
   const isDischarging = batteryPower < 0;
@@ -571,7 +584,7 @@ export default function PowerFlowDiagram({
               </span>
             </div>
 
-            <div className={`relative group flex items-center gap-2.5 sm:gap-4 px-3.5 py-2 sm:px-6 sm:py-3.5 rounded-xl sm:rounded-2xl bg-white/95 dark:bg-[#121929]/95 border shadow-[0_4px_22px_rgba(16,185,129,0.15)] transition-all min-w-[220px] sm:min-w-[320px] max-w-md ${
+            <div className={`relative group flex items-center gap-2.5 sm:gap-4 px-3.5 py-2 sm:px-6 sm:py-3.5 rounded-xl sm:rounded-2xl bg-white/95 dark:bg-[#121929]/95 border shadow-[0_4px_22px_rgba(16,185,129,0.15)] transition-all min-w-[220px] sm:min-w-[380px] max-w-lg ${
               isCharging
                 ? 'border-emerald-500/35 hover:border-emerald-500/60'
                 : isDischarging
@@ -595,7 +608,7 @@ export default function PowerFlowDiagram({
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 truncate">
                     {isEn ? 'Battery' : 'Акумулятор'}
-                    <span className="hidden sm:inline"> (BESS LiFePO4)</span>
+                    <span className="hidden sm:inline"> ({batteryModel})</span>
                   </span>
                   <span className={`px-1.5 py-0.2 rounded text-[8px] sm:text-[9px] font-mono font-semibold border shrink-0 ${
                     isCharging
@@ -621,19 +634,33 @@ export default function PowerFlowDiagram({
                   </span>
                 </div>
                 {/* Secondary battery specs hidden on small mobile screens */}
-                <div className="hidden sm:flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400 mt-1 pt-1.5 border-t border-slate-100 dark:border-white/[0.05]">
-                  <span>
+                <div className="hidden sm:flex items-center justify-between gap-2 text-[10px] font-mono text-slate-500 dark:text-slate-400 mt-1 pt-1.5 border-t border-slate-100 dark:border-white/[0.05]">
+                  <span className="whitespace-nowrap">
                     {isEn ? 'Current:' : 'Струм:'}{' '}
                     <strong className={`font-semibold ${isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-400'}`}>
                       {isCharging ? `+${batteryCurrent}` : isDischarging ? `-${batteryCurrent}` : '0.0'} A
                     </strong>
                   </span>
                   <span>•</span>
-                  <span>142 {isEn ? 'cycles' : 'циклів'}</span>
-                  <span>•</span>
-                  <span>
-                    SOH: <strong className="text-slate-700 dark:text-slate-200 font-semibold">99.2%</strong>
+                  <span
+                    className="whitespace-nowrap cursor-help"
+                    title={isEn
+                      ? `Avg: ${avgCycles} cycles • B1 (Nov 2025): ${bat1Kwh} kWh (${bat1Cycles} cyc) • B2 (Feb 2026): ${bat2Kwh} kWh (${bat2Cycles} cyc)`
+                      : `Сер.: ${avgCycles} циклів • B1 (11.2025): ${bat1Kwh} кВт·год (${bat1Cycles} ц.) • B2 (02.2026): ${bat2Kwh} кВт·год (${bat2Cycles} ц.)`}
+                  >
+                    B1: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{bat1Cycles}</strong> / B2: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{bat2Cycles}</strong> {isEn ? 'cycles' : 'циклів'}
                   </span>
+                  <span>•</span>
+                  <span
+                    className="whitespace-nowrap cursor-help"
+                    title={`B1: ${bat1Soh}% • B2: ${bat2Soh}%`}
+                  >
+                    SOH: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{avgSoh}%</strong>
+                  </span>
+                </div>
+                <div className="hidden sm:flex items-center justify-between gap-2 text-[9px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
+                  <span>B1 (11.2025): {bat1Soh}% ({bat1Kwh} {isEn ? 'kWh' : 'кВт·год'})</span>
+                  <span>B2 (02.2026): {bat2Soh}% ({bat2Kwh} {isEn ? 'kWh' : 'кВт·год'})</span>
                 </div>
               </div>
             </div>
