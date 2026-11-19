@@ -104,19 +104,25 @@ export default function MobileKpiGrid({
           <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
             {t.kpiBattery}
           </span>
-          <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
-            isCharging
-              ? 'bg-emerald-500/15 text-emerald-500'
-              : isDischarging
-              ? 'bg-rose-500/15 text-rose-500'
-              : 'bg-slate-100 dark:bg-white/[0.08] text-slate-400'
-          }`}>
-            {isCharging ? (
-              <BatteryCharging className="w-3.5 h-3.5" />
-            ) : (
-              <Battery className="w-3.5 h-3.5" />
-            )}
-          </div>
+          {isCharging && timeToFullChargeSec !== null ? (
+            <span className="font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+              ~{formatDurationHuman(timeToFullChargeSec, isEn, false)}
+            </span>
+          ) : (
+            <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
+              isCharging
+                ? 'bg-emerald-500/15 text-emerald-500'
+                : isDischarging
+                ? 'bg-rose-500/15 text-rose-500'
+                : 'bg-slate-100 dark:bg-white/[0.08] text-slate-400'
+            }`}>
+              {isCharging ? (
+                <BatteryCharging className="w-3.5 h-3.5" />
+              ) : (
+                <Battery className="w-3.5 h-3.5" />
+              )}
+            </div>
+          )}
         </div>
         <div className="my-1.5">
           <div className="flex items-center justify-between gap-1">
@@ -132,11 +138,6 @@ export default function MobileKpiGrid({
                 {battCharge > 0 ? `+${battCharge} ${unitW}` : (battDischarge > 0 ? `-${battDischarge} ${unitW}` : `0 ${unitW}`)}
               </span>
             </div>
-            {isCharging && timeToFullChargeSec !== null && (
-              <span className="font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400 truncate">
-                ~{formatDurationHuman(timeToFullChargeSec, isEn, false)}
-              </span>
-            )}
           </div>
         </div>
         <div className="flex flex-col gap-0.5 pt-1.5 border-t border-slate-100 dark:border-white/[0.05]">

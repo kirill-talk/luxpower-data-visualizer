@@ -812,8 +812,8 @@ export default function App() {
       {/* TOP APP HEADER & MAIN CONTENT WRAPPER */}
       <div className="lg:pl-64">
         {/* TOP HEADER */}
-        <header className="fixed top-0 left-0 lg:left-64 right-0 min-h-16 bg-white/85 dark:bg-[#0a0e17]/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08] z-40 px-3 sm:px-6 py-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 transition-colors duration-200">
-          {/* Identity & Status: In single row on mobile (GRID, LAN, Update Time, Refresh icon, Auth) */}
+        <header className="fixed top-0 left-0 lg:left-64 right-0 min-h-16 bg-white/85 dark:bg-[#0a0e17]/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08] z-40 px-3 sm:px-6 py-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2 transition-colors duration-200">
+          {/* Identity & Status: In single row on mobile (GRID, LAN, Update Time) */}
           <div className="flex items-center justify-between gap-2 min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
               <button
@@ -874,8 +874,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* Right cluster: Refresh icon on the left, Auth icon always at the far right */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            {/* Mobile-only action buttons (< lg): Refresh on left, Auth on far right */}
+            <div className="flex lg:hidden items-center gap-1.5 shrink-0">
               {/* Refresh Button (icon only) */}
               <button
                 onClick={handleManualRefresh}
@@ -886,54 +886,87 @@ export default function App() {
                 <RefreshCw className={`w-3.5 h-3.5 text-emerald-500 ${loading ? 'animate-spin' : ''}`} />
               </button>
 
-              {/* Auth Button (always far right) */}
+              {/* Auth Button */}
               <button
                 onClick={() => setAuthModalOpen(true)}
-                className={`flex items-center justify-center sm:px-2.5 sm:gap-1.5 h-8 rounded-lg border text-xs font-mono font-semibold transition-all shadow-sm ${
+                className={`flex items-center justify-center w-8 h-8 rounded-lg border text-xs font-mono font-semibold transition-all shadow-sm ${
                   status?.connected || customAuth
-                    ? 'w-8 sm:w-auto px-0 bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                    : 'w-8 sm:w-auto px-0 bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400 animate-pulse'
+                    ? 'bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400 animate-pulse'
                 }`}
                 title={status?.connected || customAuth ? t.authStatusConnected : t.authSignIn}
               >
                 {status?.connected || customAuth ? (
-                  <>
-                    <UserCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span className="hidden sm:inline max-w-[100px] truncate">{customAuth?.account || status?.account || 'Auth'}</span>
-                  </>
+                  <UserCheck className="w-4 h-4 text-emerald-500 shrink-0" />
                 ) : (
-                  <>
-                    <Lock className="w-4 h-4 text-amber-500 shrink-0" />
-                    <span className="hidden sm:inline">{t.authSignIn}</span>
-                  </>
+                  <Lock className="w-4 h-4 text-amber-500 shrink-0" />
                 )}
               </button>
             </div>
           </div>
 
-          {/* Controls: Date Navigator */}
-          <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2 min-w-0">
-            {/* Date Navigator: Custom Monday-first calendar picker in header */}
-            <div className="inline-flex items-center rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] p-0.5 shadow-sm shrink-0">
+          {/* Right cluster on >= 1024px (lg:): Date Navigator on the left, Refresh and Auth aligned to the far right. Full-width on mobile. */}
+          <div className="flex items-center justify-between lg:justify-end gap-2 w-full lg:w-auto min-w-0">
+            {/* Date Navigator: Full-width on mobile (< lg), compact on desktop */}
+            <div className="flex items-center justify-between w-full lg:w-auto rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] p-0.5 shadow-sm">
               <button
                 onClick={handlePrevDay}
-                className="w-7 h-7 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/[0.08] rounded-md transition-all"
+                className="w-8 h-8 lg:w-7 lg:h-7 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/[0.08] rounded-md transition-all shrink-0"
                 title={t.prevDay}
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <DatePicker
-                value={selectedDate}
-                onChange={setSelectedDate}
-                lang={lang}
-                buttonClassName="px-1.5 py-1 text-[11px] sm:text-xs"
-              />
+              <div className="flex-1 flex justify-center">
+                <DatePicker
+                  value={selectedDate}
+                  onChange={setSelectedDate}
+                  lang={lang}
+                  className="w-full justify-center"
+                  buttonClassName="w-full justify-center px-2 py-1 text-xs"
+                />
+              </div>
               <button
                 onClick={handleNextDay}
-                className="w-7 h-7 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/[0.08] rounded-md transition-all"
+                className="w-8 h-8 lg:w-7 lg:h-7 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/[0.08] rounded-md transition-all shrink-0"
                 title={t.nextDay}
               >
                 <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Desktop Actions (>= lg): Refresh icon, Auth button at far right */}
+            <div className="hidden lg:flex items-center gap-1.5 shrink-0">
+              {/* Refresh Button (icon only) */}
+              <button
+                onClick={handleManualRefresh}
+                disabled={loading}
+                className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/[0.08] transition-all shadow-sm shrink-0"
+                title={t.refresh}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-emerald-500 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+
+              {/* Auth Button */}
+              <button
+                onClick={() => setAuthModalOpen(true)}
+                className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg border text-xs font-mono font-semibold transition-all shadow-sm shrink-0 ${
+                  status?.connected || customAuth
+                    ? 'bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400 animate-pulse'
+                }`}
+                title={status?.connected || customAuth ? t.authStatusConnected : t.authSignIn}
+              >
+                {status?.connected || customAuth ? (
+                  <>
+                    <UserCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span className="max-w-[100px] truncate">{customAuth?.account || status?.account || 'Auth'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>{t.authSignIn}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

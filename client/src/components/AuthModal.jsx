@@ -145,172 +145,187 @@ export default function AuthModal({
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {t.authSub}
-            </p>
+          {/* Hide login form when user is already authenticated */}
+          {!isConnected && (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {t.authSub}
+              </p>
 
-            {/* Account / Email */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                {t.authAccount}
-              </label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={account}
-                  onChange={(e) => setAccount(e.target.value)}
-                  placeholder={t.authAccountPlaceholder}
-                  className="w-full bg-slate-50 dark:bg-[#0c121e] border border-slate-200 dark:border-white/[0.08] rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all font-mono"
-                  required
-                />
+              {/* Account / Email */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  {t.authAccount}
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={account}
+                    onChange={(e) => setAccount(e.target.value)}
+                    placeholder={t.authAccountPlaceholder}
+                    className="w-full bg-slate-50 dark:bg-[#0c121e] border border-slate-200 dark:border-white/[0.08] rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all font-mono"
+                    required
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Password */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                {t.authPassword}
-              </label>
-              <div className="relative">
-                <Key className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t.authPasswordPlaceholder}
-                  className="w-full bg-slate-50 dark:bg-[#0c121e] border border-slate-200 dark:border-white/[0.08] rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all font-mono"
-                  required
-                />
+              {/* Password */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  {t.authPassword}
+                </label>
+                <div className="relative">
+                  <Key className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={t.authPasswordPlaceholder}
+                    className="w-full bg-slate-50 dark:bg-[#0c121e] border border-slate-200 dark:border-white/[0.08] rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all font-mono"
+                    required
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Server selection */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                {t.authServer}
-              </label>
-              <div className="relative">
-                <Server className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <select
-                  value={server}
-                  onChange={(e) => setServer(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-[#0c121e] border border-slate-200 dark:border-white/[0.08] rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all font-mono cursor-pointer"
+              {/* Server selection */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  {t.authServer}
+                </label>
+                <div className="relative">
+                  <Server className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <select
+                    value={server}
+                    onChange={(e) => setServer(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-[#0c121e] border border-slate-200 dark:border-white/[0.08] rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all font-mono cursor-pointer"
+                  >
+                    <option value="https://eu.luxpowertek.com">eu.luxpowertek.com (Europe / Default)</option>
+                    <option value="https://server.luxpowertek.com">server.luxpowertek.com (Global)</option>
+                    <option value="https://us.luxpowertek.com">us.luxpowertek.com (US)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Toggle Advanced Proxy URL */}
+              <div className="flex flex-col gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 hover:underline self-start flex items-center gap-1"
                 >
-                  <option value="https://eu.luxpowertek.com">eu.luxpowertek.com (Europe / Default)</option>
-                  <option value="https://server.luxpowertek.com">server.luxpowertek.com (Global)</option>
-                  <option value="https://us.luxpowertek.com">us.luxpowertek.com (US)</option>
-                </select>
-              </div>
-            </div>
+                  <span>{showAdvanced ? '▼' : '▶'}</span>
+                  <span>{lang === 'en' ? 'API Proxy / Worker URL (Optional)' : 'URL проксі / Cloudflare Worker (Опціонально)'}</span>
+                </button>
 
-            {/* Toggle Advanced Proxy URL */}
-            <div className="flex flex-col gap-1.5 pt-1">
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 hover:underline self-start flex items-center gap-1"
-              >
-                <span>{showAdvanced ? '▼' : '▶'}</span>
-                <span>{lang === 'en' ? 'API Proxy / Worker URL (Optional)' : 'URL проксі / Cloudflare Worker (Опціонально)'}</span>
-              </button>
-
-              {showAdvanced && (
-                <div className="p-3 rounded-xl bg-slate-100/70 dark:bg-[#0c121e]/80 border border-slate-200 dark:border-white/[0.06] flex flex-col gap-2">
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                    {lang === 'en'
-                      ? 'Point to your self-hosted API / Cloudflare Worker URL (e.g. https://your-server.example/api). Leave empty for default.'
-                      : 'Вкажіть URL вашого сервера або Cloudflare Worker (наприклад https://your-server.example/api). Залиште порожнім за замовчуванням.'}
-                  </span>
-                  <div className="relative">
-                    <Globe className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="url"
-                      value={apiUrl}
-                      onChange={(e) => {
-                        setApiUrl(e.target.value);
-                        setApiSavedMsg(null);
-                      }}
-                      placeholder="https://your-server.example/api"
-                      className="w-full bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-white/[0.08] rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">
-                      {apiSavedMsg || ''}
+                {showAdvanced && (
+                  <div className="p-3 rounded-xl bg-slate-100/70 dark:bg-[#0c121e]/80 border border-slate-200 dark:border-white/[0.06] flex flex-col gap-2">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                      {lang === 'en'
+                        ? 'Point to your self-hosted API / Cloudflare Worker URL (e.g. https://your-server.example/api). Leave empty for default.'
+                        : 'Вкажіть URL вашого сервера або Cloudflare Worker (наприклад https://your-server.example/api). Залиште порожнім за замовчуванням.'}
                     </span>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {apiUrl.trim() && (
+                    <div className="relative">
+                      <Globe className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="url"
+                        value={apiUrl}
+                        onChange={(e) => {
+                          setApiUrl(e.target.value);
+                          setApiSavedMsg(null);
+                        }}
+                        placeholder="https://your-server.example/api"
+                        className="w-full bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-white/[0.08] rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">
+                        {apiSavedMsg || ''}
+                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {apiUrl.trim() && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setApiUrl('');
+                              setCustomApiUrl('');
+                              setApiSavedMsg(lang === 'en' ? 'Reset to default' : 'Скинуто');
+                              if (onApiUrlSaved) onApiUrlSaved('');
+                            }}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-white/[0.05] border border-slate-200 dark:border-white/[0.08] hover:bg-slate-50 dark:hover:bg-white/[0.1] transition-colors"
+                          >
+                            {lang === 'en' ? 'Reset' : 'Скинути'}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => {
-                            setApiUrl('');
-                            setCustomApiUrl('');
-                            setApiSavedMsg(lang === 'en' ? 'Reset to default' : 'Скинуто');
-                            if (onApiUrlSaved) onApiUrlSaved('');
+                            setCustomApiUrl(apiUrl);
+                            setApiSavedMsg(lang === 'en' ? 'API URL saved' : 'API URL збережено');
+                            if (onApiUrlSaved) onApiUrlSaved(apiUrl.trim());
+                            onClose();
                           }}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-white/[0.05] border border-slate-200 dark:border-white/[0.08] hover:bg-slate-50 dark:hover:bg-white/[0.1] transition-colors"
+                          className="px-3 py-1 rounded-lg text-[11px] font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-colors"
                         >
-                          {lang === 'en' ? 'Reset' : 'Скинути'}
+                          {lang === 'en' ? 'Save API URL' : 'Зберегти API URL'}
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCustomApiUrl(apiUrl);
-                          setApiSavedMsg(lang === 'en' ? 'API URL saved' : 'API URL збережено');
-                          if (onApiUrlSaved) onApiUrlSaved(apiUrl.trim());
-                          onClose();
-                        }}
-                        className="px-3 py-1 rounded-lg text-[11px] font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-colors"
-                      >
-                        {lang === 'en' ? 'Save API URL' : 'Зберегти API URL'}
-                      </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            {/* Remember Me */}
-            <label className="flex items-center gap-2 cursor-pointer mt-1">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-                className="w-4 h-4 rounded text-emerald-500 border-slate-300 dark:border-slate-700 focus:ring-emerald-500 bg-slate-50 dark:bg-[#0c121e]"
-              />
-              <span className="text-xs text-slate-600 dark:text-slate-400">
-                {t.authRemember}
-              </span>
-            </label>
+              {/* Remember Me */}
+              <label className="flex items-center gap-2 cursor-pointer mt-1">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="w-4 h-4 rounded text-emerald-500 border-slate-300 dark:border-slate-700 focus:ring-emerald-500 bg-slate-50 dark:bg-[#0c121e]"
+                />
+                <span className="text-xs text-slate-600 dark:text-slate-400">
+                  {t.authRemember}
+                </span>
+              </label>
 
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-2.5 mt-3 pt-3 border-t border-slate-100 dark:border-white/[0.06]">
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2.5 mt-3 pt-3 border-t border-slate-100 dark:border-white/[0.06]">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05] transition-colors"
+                >
+                  {lang === 'en' ? 'Cancel' : 'Скасувати'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-md shadow-emerald-500/20 disabled:opacity-50 transition-all flex items-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>{t.authSigningIn}</span>
+                    </>
+                  ) : (
+                    <span>{t.authSignIn}</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {isConnected && (
+            <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-white/[0.06]">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05] transition-colors"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-slate-700 hover:bg-slate-800 dark:bg-white/[0.1] dark:hover:bg-white/[0.15] transition-colors"
               >
-                {lang === 'en' ? 'Cancel' : 'Скасувати'}
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-md shadow-emerald-500/20 disabled:opacity-50 transition-all flex items-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>{t.authSigningIn}</span>
-                  </>
-                ) : (
-                  <span>{t.authSignIn}</span>
-                )}
+                {lang === 'en' ? 'Close' : 'Закрити'}
               </button>
             </div>
-          </form>
+          )}
         </div>
       </div>
     </div>
