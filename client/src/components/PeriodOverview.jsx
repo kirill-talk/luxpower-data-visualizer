@@ -429,7 +429,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
             </div>
             <div className="flex flex-col border-l border-slate-100 dark:border-white/[0.06] pl-2">
               <span className="text-[10px] text-purple-400 uppercase font-sans">
-                {isEn ? 'Inverter Self-Cons.' : 'Інвертор (власне)'}
+                {isEn ? 'Inverter' : 'Інвертор'}
               </span>
               <span className="font-bold text-purple-500 dark:text-purple-400">
                 {totalInverterCostUah} ₴
