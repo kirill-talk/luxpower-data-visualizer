@@ -248,7 +248,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
   return (
     <div className="flex flex-col gap-5 w-full">
       {/* 5 Summary KPI Modules for Period (including Inverter Loss / Consumption) */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 sm:gap-4">
         {/* KPI 1: Total Consumption & Average/Day */}
         <div className="bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between gap-1.5">
@@ -338,7 +338,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
         </div>
 
         {/* KPI 5: Autonomy Ratio */}
-        <div className="col-span-2 lg:col-span-1 bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
+        <div className="col-span-2 md:col-span-1 bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between gap-1.5">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">
               {t.selfSufficiency}
