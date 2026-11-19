@@ -112,11 +112,6 @@ export default function PowerFlowDiagram({
                 LIVE
               </span>
             </div>
-            <span className="hidden sm:inline text-xs font-mono text-slate-400 dark:text-slate-400 mt-0.5">
-              {isEn
-                ? 'Interactive active power distribution map of SNA 6K inverter nodes'
-                : 'Інтерактивна карта розподілу активних потужностей вузлів інвертора SNA 6K'}
-            </span>
           </div>
         </div>
 
