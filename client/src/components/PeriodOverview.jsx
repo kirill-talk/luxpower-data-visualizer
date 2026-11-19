@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as echarts from 'echarts';
 import {
   Calendar,
@@ -27,6 +27,35 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
 
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
+
+  const pills = useMemo(() => [
+    { key: 'load', name: t.totalConsumption, dotColor: 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.8)]' },
+    { key: 'import', name: t.gridImportKwh, dotColor: 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]' },
+    { key: 'dischg', name: t.totalBatteryDischarge, dotColor: 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]' },
+    { key: 'chg', name: t.totalBatteryCharge, dotColor: 'bg-blue-400 shadow-[0_0_6px_rgba(59,130,246,0.8)]' },
+    { key: 'loss', name: t.totalInverterLoss, dotColor: 'bg-purple-500 shadow-[0_0_6px_rgba(168,85,247,0.8)]' },
+  ], [t]);
+
+  const [selectedSeries, setSelectedSeries] = useState({
+    load: true,
+    import: true,
+    dischg: true,
+    chg: true,
+    loss: true,
+  });
+
+  const toggleSeries = (key, seriesName) => {
+    setSelectedSeries((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.dispatchAction({
+          type: 'legendToggleSelect',
+          name: seriesName,
+        });
+      }
+      return next;
+    });
+  };
 
   const {
     totalConsumptionKwh = 0,
@@ -114,22 +143,20 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
         },
       },
       legend: {
-        show: true,
-        top: 0,
-        right: 10,
-        textStyle: {
-          color: isDarkMode ? '#94a3b8' : '#64748b',
-          fontSize: 11,
-          fontFamily: 'JetBrains Mono, monospace',
+        show: false,
+        selected: {
+          [t.totalConsumption]: selectedSeries.load,
+          [t.gridImportKwh]: selectedSeries.import,
+          [t.totalBatteryDischarge]: selectedSeries.dischg,
+          [t.totalBatteryCharge]: selectedSeries.chg,
+          [t.totalInverterLoss]: selectedSeries.loss,
         },
-        itemWidth: 12,
-        itemHeight: 12,
       },
       grid: {
         left: '2%',
         right: '2%',
         bottom: '8%',
-        top: '16%',
+        top: '6%',
         containLabel: true,
       },
       xAxis: {
@@ -164,7 +191,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
       },
       series: [
         {
-          name: t.homeLoadKwh,
+          name: t.totalConsumption,
           type: 'bar',
           data: loadData,
           itemStyle: {
@@ -216,7 +243,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
     const handleResize = () => chart.resize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [dailyList, isEn, lang, t, unitKwh]);
+  }, [dailyList, isEn, lang, t, unitKwh, selectedSeries]);
 
   return (
     <div className="flex flex-col gap-5 w-full">
@@ -428,6 +455,28 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
             {daysCount} {t.periodDaysCount}
           </span>
         </div>
+
+        {/* Interactive Legend Pills like in PowerFlowChart */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {pills.map((pill) => {
+            const isSelected = selectedSeries[pill.key];
+            return (
+              <button
+                key={pill.key}
+                onClick={() => toggleSeries(pill.key, pill.name)}
+                className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-mono font-medium transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-slate-100 dark:bg-white/[0.08] border-slate-300 dark:border-white/20 text-slate-800 dark:text-slate-100 shadow-sm'
+                    : 'bg-transparent border-slate-200 dark:border-white/[0.05] text-slate-400 dark:text-slate-500 opacity-60 hover:opacity-100'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${pill.dotColor}`} />
+                <span>{pill.name}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <div ref={chartRef} className="w-full h-80" />
       </div>
     </div>
