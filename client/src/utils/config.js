@@ -31,13 +31,24 @@ export async function apiFetch(path, options = {}) {
   const fallbackBase = 'https://data-visualizer.kidev.uk/api';
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
 
+  // Ensure fresh responses and bypass browser 304 caching on dynamic endpoints
+  const fetchOptions = {
+    cache: 'no-store',
+    ...options,
+    headers: {
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      ...(options.headers || {}),
+    },
+  };
+
   try {
-    const res = await fetch(`${primaryBase}${cleanPath}`, options);
+    const res = await fetch(`${primaryBase}${cleanPath}`, fetchOptions);
     return res;
   } catch (primaryErr) {
     if (primaryBase !== fallbackBase) {
       console.warn(`[apiFetch] Primary (${primaryBase}) failed, retrying with fallback (${fallbackBase}):`, primaryErr);
-      return await fetch(`${fallbackBase}${cleanPath}`, options);
+      return await fetch(`${fallbackBase}${cleanPath}`, fetchOptions);
     }
     throw primaryErr;
   }

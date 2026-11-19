@@ -12,6 +12,15 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+// Disable ETag / caching on dynamic API telemetry endpoints so polling always receives fresh data
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  next();
+});
+
 const client = new LuxpowerClient(process.env.LUX_BASE_URL || 'https://eu.luxpowertek.com');
 let cachedSerial = null;
 let cachedPlant = null;

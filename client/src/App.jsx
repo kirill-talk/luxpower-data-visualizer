@@ -461,8 +461,22 @@ export default function App() {
     }
   }, [selectedDate, periodMode, customRange?.start, customRange?.end]);
 
+  // Keep latest ref so timer interval doesn't need to re-bind or recreate
+  const refreshFnRef = useRef(handleManualRefresh);
+  refreshFnRef.current = handleManualRefresh;
+
+  // 6-minute (360s) Auto-refresh timer with timestamp tracking
+  // Tracks elapsed wall-clock time so background tab throttling doesn't stall refresh
+  const targetRefreshTimeRef = useRef(Date.now() + 360 * 1000);
+
+  // Sync target time when countdown is reset manually
+  const resetCountdownTimer = (seconds = 360) => {
+    targetRefreshTimeRef.current = Date.now() + seconds * 1000;
+    setCountdown(seconds);
+  };
+
   const handleManualRefresh = () => {
-    setCountdown(360);
+    resetCountdownTimer(360);
     fetchLive();
     if (periodMode === '1d') {
       fetchHistory(selectedDate);
@@ -478,30 +492,47 @@ export default function App() {
     }
   };
 
-  // Keep latest ref so timer interval doesn't need to re-bind or recreate
-  const refreshFnRef = useRef(handleManualRefresh);
-  refreshFnRef.current = handleManualRefresh;
-
-  // 6-minute (360s) Auto-refresh timer with 1s countdown tick
-  // Refreshes only when counter reaches 0 seconds; never resets or re-fires on tab switching
   useEffect(() => {
     if (!autoRefresh) {
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
       return;
     }
 
+    targetRefreshTimeRef.current = Date.now() + countdown * 1000;
+
     countdownTimerRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          if (refreshFnRef.current) refreshFnRef.current();
-          return 360;
-        }
-        return prev - 1;
-      });
+      const now = Date.now();
+      const remainingSec = Math.max(0, Math.round((targetRefreshTimeRef.current - now) / 1000));
+
+      if (remainingSec <= 0) {
+        targetRefreshTimeRef.current = Date.now() + 360 * 1000;
+        setCountdown(360);
+        if (refreshFnRef.current) refreshFnRef.current();
+      } else {
+        setCountdown(remainingSec);
+      }
     }, 1000);
+
+    // Also listen to visibilitychange: when user returns to tab after it was throttled in background
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && autoRefresh) {
+        const now = Date.now();
+        const remainingSec = Math.max(0, Math.round((targetRefreshTimeRef.current - now) / 1000));
+        if (remainingSec <= 0) {
+          targetRefreshTimeRef.current = Date.now() + 360 * 1000;
+          setCountdown(360);
+          if (refreshFnRef.current) refreshFnRef.current();
+        } else {
+          setCountdown(remainingSec);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [autoRefresh]);
 
@@ -882,8 +913,9 @@ export default function App() {
             {/* Auto refresh badge */}
             <button
               onClick={() => {
-                setAutoRefresh(!autoRefresh);
-                setCountdown(360);
+                const next = !autoRefresh;
+                setAutoRefresh(next);
+                if (next) resetCountdownTimer(360);
               }}
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] hover:border-cyan-500/40 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/[0.08] transition-all shadow-sm text-xs font-medium"
               title={t.autoMin}
@@ -950,8 +982,9 @@ export default function App() {
                 countdown={countdown}
                 autoRefresh={autoRefresh}
                 onToggleAutoRefresh={() => {
-                  setAutoRefresh(!autoRefresh);
-                  setCountdown(360);
+                  const next = !autoRefresh;
+                  setAutoRefresh(next);
+                  if (next) resetCountdownTimer(360);
                 }}
                 onRefresh={handleManualRefresh}
                 loading={loading}
