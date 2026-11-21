@@ -47,7 +47,15 @@ class LuxpowerClient {
       this.cookie = setCookies.map(c => c.split(';')[0]).join('; ');
     }
 
-    // Call api/login as well to obtain structured user and plant metadata
+    let isAuthValid = false;
+    let authError = 'Authentication failed. Check credentials.';
+
+    // Check if web/login redirected (successful auth returns 302 redirect)
+    if (res.status === 302 || (res.headers['location'] && !res.headers['location'].includes('login'))) {
+      isAuthValid = true;
+    }
+
+    // Call api/login as well to obtain structured user and plant metadata and verify auth
     try {
       const apiRes = await this.client.post('/WManage/api/login', querystring.stringify({
         account,
@@ -59,14 +67,27 @@ class LuxpowerClient {
         },
       });
       if (apiRes.data && apiRes.data.success) {
+        isAuthValid = true;
         this.deviceInfo = {
           userVisitRecord: apiRes.data.userVisitRecord,
           plants: apiRes.data.plants,
           username: apiRes.data.username,
         };
+      } else if (apiRes.data && apiRes.data.msg) {
+        if (apiRes.data.msg === 'LOGIN_ERROR_DISMATCH') {
+          authError = 'Incorrect username or password.';
+        } else {
+          authError = apiRes.data.msg;
+        }
       }
     } catch (e) {
       console.warn('API metadata fetch warning:', e.message);
+    }
+
+    if (!this.cookie || !isAuthValid) {
+      const err = new Error(authError);
+      err.status = 401;
+      throw err;
     }
 
     return {

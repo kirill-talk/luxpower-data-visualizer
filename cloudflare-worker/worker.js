@@ -97,41 +97,63 @@ export default {
         const setCookieHeader = loginRes.headers.get('set-cookie') || '';
         let cookie = setCookieHeader.split(';')[0];
 
-        // Call api/login with the cookie to get inverter serial & plant info
+        // Call api/login with the cookie to verify credentials and obtain user/plant metadata
         let userSerial = null;
         let plant = null;
         let deviceInfo = null;
+        let isAuthValid = false;
+        let authErrorMessage = 'Authentication failed. Check credentials.';
 
-        try {
-          const apiLoginRes = await fetch(`${apiBase}/WManage/api/login`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-              'Cookie': cookie,
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
-            },
-            body: formData.toString(),
-          });
-          const apiData = await apiLoginRes.json();
-          if (apiData && apiData.success) {
-            deviceInfo = {
-              userVisitRecord: apiData.userVisitRecord,
-              plants: apiData.plants,
-              username: apiData.username,
-            };
-            if (apiData.plants && apiData.plants.length > 0) {
-              plant = apiData.plants[0];
-              if (plant.inverters && plant.inverters.length > 0) {
-                userSerial = plant.inverters[0].serialNum;
+        if (cookie) {
+          try {
+            const apiLoginRes = await fetch(`${apiBase}/WManage/api/login`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Cookie': cookie,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
+              },
+              body: formData.toString(),
+            });
+            const apiData = await apiLoginRes.json();
+            if (apiData && apiData.success) {
+              isAuthValid = true;
+              deviceInfo = {
+                userVisitRecord: apiData.userVisitRecord,
+                plants: apiData.plants,
+                username: apiData.username,
+              };
+              if (apiData.plants && apiData.plants.length > 0) {
+                plant = apiData.plants[0];
+                if (plant.inverters && plant.inverters.length > 0) {
+                  userSerial = plant.inverters[0].serialNum;
+                }
+              }
+            } else if (apiData && apiData.msg) {
+              if (apiData.msg === 'LOGIN_ERROR_DISMATCH') {
+                authErrorMessage = 'Incorrect username or password.';
+              } else {
+                authErrorMessage = apiData.msg;
               }
             }
+          } catch (e) {
+            // If api/login network error occurred but web/login succeeded with 302 redirect
+            if (loginRes.status === 302 || loginRes.headers.get('location')) {
+              isAuthValid = true;
+            }
           }
-        } catch (e) {
-          // ignore metadata failure if cookie exists
         }
 
-        if (!cookie) {
-          return jsonResponse({ success: false, error: 'Authentication failed. Check credentials.' }, 401);
+        // If api/login failed or wasn't confirmed
+        if (!cookie || !isAuthValid) {
+          // If web login was a 302 redirect to /WManage/, treat as authenticated even if api/login parsing had issues
+          if (cookie && (loginRes.status === 302 || (loginRes.headers.get('location') && !loginRes.headers.get('location').includes('login')))) {
+            isAuthValid = true;
+          }
+        }
+
+        if (!cookie || !isAuthValid) {
+          return jsonResponse({ success: false, error: authErrorMessage }, 401);
         }
 
         return jsonResponse({

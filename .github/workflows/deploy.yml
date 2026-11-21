@@ -39,8 +39,8 @@ jobs:
         working-directory: ./client
         env:
           VITE_BASE_PATH: '/luxpower-data-visualizer/'
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || vars.VITE_API_BASE_URL || 'https://luxpower-proxy.kirill-talk.workers.dev/api' }}
-          VITE_FALLBACK_API_URL: ${{ secrets.VITE_FALLBACK_API_URL || vars.VITE_FALLBACK_API_URL || 'https://luxpower-proxy.kirill-talk.workers.dev/api' }}
+          VITE_API_BASE_URL: 'https://luxpower-proxy.kirill-talk.workers.dev/api'
+          VITE_FALLBACK_API_URL: 'https://luxpower-proxy.kirill-talk.workers.dev/api'
         run: npm run build
 
       - name: Setup GitHub Pages
