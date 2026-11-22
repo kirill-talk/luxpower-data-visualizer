@@ -156,6 +156,12 @@ class BatteryWidgetProvider : AppWidgetProvider() {
             )
             val progressVal = if (soc >= 0) soc.coerceIn(0, 100) else 0
 
+            val etaText = when {
+                state == WidgetPrefs.STATE_CHARGING && eta.startsWith("~") -> "Заряд $eta"
+                state == WidgetPrefs.STATE_DISCHARGING && eta.startsWith("~") -> "Разряд $eta"
+                else -> eta
+            }
+
             val statusText = when {
                 isLoading -> "..."
                 lastError.isNotBlank() -> "Ош: $lastError"
@@ -188,7 +194,7 @@ class BatteryWidgetProvider : AppWidgetProvider() {
                     setImageViewResource(R.id.widget_state_icon, stateIconRes(state))
                     setTextViewText(R.id.widget_soc, socText)
                     setTextColor(R.id.widget_soc, socColor(soc))
-                    setTextViewText(R.id.widget_eta, eta)
+                    setTextViewText(R.id.widget_eta, etaText)
                     setTextColor(R.id.widget_eta, etaColor(state))
                     setTextViewText(R.id.widget_voltage, voltageText)
                     setProgressBar(R.id.widget_progress, 100, progressVal, false)
