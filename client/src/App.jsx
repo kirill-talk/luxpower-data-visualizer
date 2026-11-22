@@ -33,6 +33,7 @@ import MobileRecentLog from './components/mobile/MobileRecentLog';
 import MobilePowerFlowDiagram from './components/mobile/MobilePowerFlowDiagram';
 import AuthModal from './components/AuthModal';
 import PeriodOverview from './components/PeriodOverview';
+import UptimeHistoryTab from './components/UptimeHistoryTab';
 import DatePicker from './components/DatePicker';
 import { getCachedDayChart, setCachedDayChart, runWithConcurrency, isPastDate, cleanupLegacyLocalStorage } from './utils/telemetryCache';
 import { translations } from './utils/i18n';
@@ -48,6 +49,7 @@ import {
   integrateEnergy,
   normalizeGridAndEps,
   calculatePowerSourceDurations,
+  analyzePowerSourceHistory,
   calculateTimeToFullCharge,
   calculateBatteryHealth,
   formatDurationHuman
@@ -326,10 +328,12 @@ export default function App() {
           if (cachedData && Array.isArray(cachedData) && cachedData.length > 0) {
             const points = cachedData.map(parseInverterPoint).filter(Boolean);
             const stats = integrateEnergy(points);
+            const uptimeStats = analyzePowerSourceHistory(cachedData, d);
             return {
               date: d,
               points,
               ...stats,
+              uptimeStats,
             };
           }
         }
@@ -347,6 +351,7 @@ export default function App() {
             const rawData = json && json.data ? json.data : [];
             const points = rawData.map(parseInverterPoint).filter(Boolean);
             const stats = integrateEnergy(points);
+            const uptimeStats = analyzePowerSourceHistory(rawData, d);
 
             // Cache if past date
             if (isPastDate(d) && rawData.length > 0) {
@@ -357,6 +362,7 @@ export default function App() {
               date: d,
               points,
               ...stats,
+              uptimeStats,
             };
           } catch (e) {
             if (attempts >= 2) {
@@ -369,6 +375,7 @@ export default function App() {
                 batteryChargeKwh: 0,
                 batteryDischargeKwh: 0,
                 inverterLossKwh: 0,
+                uptimeStats: analyzePowerSourceHistory([], d),
               };
             }
             // Wait 250ms before retry
@@ -390,6 +397,13 @@ export default function App() {
       let totalCostDayUah = 0;
       let totalCostUah = 0;
       let totalInverterCostUah = 0;
+      let totalBatterySec = 0;
+      let totalGridSec = 0;
+      let totalOutagesCount = 0;
+      let totalSignificantOutagesCount = 0;
+      let longestBatterySec = 0;
+      let longestGridSec = 0;
+      const allIntervals = [];
 
       results.forEach((r) => {
         totalConsumptionKwh += r.consumptionKwh || 0;
@@ -401,6 +415,21 @@ export default function App() {
         totalCostDayUah += r.costDayUah || 0;
         totalCostUah += r.costTotalUah || 0;
         totalInverterCostUah += r.inverterCostTotalUah || 0;
+        if (r.uptimeStats) {
+          totalBatterySec += r.uptimeStats.totalBatterySec || 0;
+          totalGridSec += r.uptimeStats.totalGridSec || 0;
+          totalOutagesCount += r.uptimeStats.outagesCount || 0;
+          totalSignificantOutagesCount += r.uptimeStats.significantOutagesCount || 0;
+          if ((r.uptimeStats.longestBatterySec || 0) > longestBatterySec) {
+            longestBatterySec = r.uptimeStats.longestBatterySec;
+          }
+          if ((r.uptimeStats.longestGridSec || 0) > longestGridSec) {
+            longestGridSec = r.uptimeStats.longestGridSec;
+          }
+          if (Array.isArray(r.uptimeStats.intervals)) {
+            allIntervals.push(...r.uptimeStats.intervals);
+          }
+        }
       });
 
       setPeriodStats({
@@ -416,6 +445,13 @@ export default function App() {
         totalCostDayUah: parseFloat(totalCostDayUah.toFixed(2)),
         totalCostUah: parseFloat(totalCostUah.toFixed(2)),
         totalInverterCostUah: parseFloat(totalInverterCostUah.toFixed(2)),
+        totalBatterySec,
+        totalGridSec,
+        totalOutagesCount,
+        totalSignificantOutagesCount,
+        longestBatterySec,
+        longestGridSec,
+        allIntervals,
         dailyList: results,
       });
 
@@ -572,6 +608,12 @@ export default function App() {
     return calculatePowerSourceDurations(tableRows, gridEpsInfo.isGridOnline, soc);
   }, [tableRows, gridEpsInfo.isGridOnline, soc]);
 
+  // Single-day detailed power source history (intervals, outage counts, energy per session)
+  const singleDayUptime = useMemo(() => {
+    const sourceItems = tableRows && tableRows.length > 0 ? tableRows : chartData;
+    return analyzePowerSourceHistory(sourceItems, selectedDate);
+  }, [tableRows, chartData, selectedDate]);
+
   // Estimated time until full charge (based on current charging power and 2-stage BMS curve)
   const timeToFullChargeSec = useMemo(() => {
     return calculateTimeToFullCharge(soc, battCharge);
@@ -675,11 +717,12 @@ export default function App() {
     };
   }, [gridRangeRows]);
 
-  const isPeriodModeActive = activeTab === 'consumption' && periodMode !== '1d';
+  const isPeriodModeActive = (activeTab === 'consumption' || activeTab === 'uptime-history') && periodMode !== '1d';
 
   const navLinks = [
     { id: 'dashboard', label: t.navDashboard || 'Dashboard', icon: Share2 },
     { id: 'consumption', label: t.navConsumption || 'Споживання', icon: Activity },
+    { id: 'uptime-history', label: t.navUptimeHistory || 'Час роботи', icon: Clock },
     { id: 'battery-bms', label: t.navBatteryBms || 'Батарея та BMS', icon: BatteryCharging },
     { id: 'grid-temp', label: t.navGridTemp || 'Мережа та Температура', icon: Radio },
     { id: 'telemetry-logs', label: t.navTelemetryLogs || 'Журнал телеметрії', icon: Table2 },
@@ -1016,11 +1059,18 @@ export default function App() {
                 {/* DESKTOP KPI INSTRUMENT STRIP (4 Modules) - Visible on 1200px+ (xl) */}
                 <section className="hidden xl:grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 w-full">
                   {/* KPI 1: Power Source Uptime (Battery or Grid) with Live Timer */}
-                  <div className={`relative bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-5 border shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between group transition-all ${
-                    gridEpsInfo.isGridOnline
-                      ? 'border-slate-200/90 dark:border-white/[0.08] hover:border-emerald-500/40'
-                      : 'border-amber-500/30 hover:border-amber-500/50'
-                  }`}>
+                  <div
+                    onClick={() => {
+                      setActiveTab('uptime-history');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    title={t.navUptimeHistory}
+                    className={`relative bg-white dark:bg-[#111827]/90 backdrop-blur-md rounded-2xl p-5 border shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between group transition-all cursor-pointer ${
+                      gridEpsInfo.isGridOnline
+                        ? 'border-slate-200/90 dark:border-white/[0.08] hover:border-emerald-500/40'
+                        : 'border-amber-500/30 hover:border-amber-500/50'
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         {gridEpsInfo.isGridOnline ? t.gridUptime : t.batteryUptime}
@@ -1458,6 +1508,105 @@ export default function App() {
                     <PowerFlowChart rawData={chartData} onZoomChange={setRangePoints} lang={lang} />
                   </section>
                 )}
+              </div>
+            )}
+
+            {/* TAB 2.5: UPTIME HISTORY (Історія роботи від батареї та мережі) */}
+            {activeTab === 'uptime-history' && (
+              <div className="flex flex-col gap-6">
+                {/* Period Mode Selector Toolbar in Uptime History Tab */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5 overflow-x-auto p-0.5 rounded-xl bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08]">
+                    {[
+                      { key: '1d', label: t.period1d || '1д' },
+                      { key: '7d', label: t.period7d || '1н' },
+                      { key: 'month', label: t.periodMonth || '1м' },
+                      { key: 'custom', label: t.periodCustom || 'Період' },
+                    ].map((p) => (
+                      <button
+                        key={p.key}
+                        onClick={() => {
+                          setPeriodMode(p.key);
+                          if (p.key !== 'custom') {
+                            setSelectedDate(getTodayLocalDate());
+                          }
+                        }}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
+                          periodMode === p.key
+                            ? 'bg-emerald-500 text-white shadow-sm font-semibold'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Range inputs: only shown if custom range is selected */}
+                  {periodMode === 'custom' && (
+                    <div className="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/90 dark:bg-white/[0.05] border border-slate-200/80 dark:border-white/[0.08] text-xs font-mono">
+                      <span className="text-slate-500 dark:text-slate-400 text-[11px]">{t.rangeFrom}:</span>
+                      <DatePicker
+                        value={customRange?.start || ''}
+                        onChange={(val) => setCustomRange((prev) => ({ ...prev, start: val }))}
+                        lang={lang}
+                      />
+                      <span className="text-slate-400">-</span>
+                      <span className="text-slate-500 dark:text-slate-400 text-[11px]">{t.rangeTo}:</span>
+                      <DatePicker
+                        value={customRange?.end || ''}
+                        onChange={(val) => setCustomRange((prev) => ({ ...prev, end: val }))}
+                        lang={lang}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <section id="uptime-history-section" className="flex flex-col gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                      <div className="flex flex-col">
+                        <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                          {periodMode === '1d'
+                            ? `${t.secUptimeTitle}: ${formatDateHuman(selectedDate, lang)}`
+                            : (() => {
+                                const range = periodMode === 'custom'
+                                  ? { start: customRange?.start || selectedDate, end: customRange?.end || selectedDate }
+                                  : calculatePeriodDates(periodMode);
+                                return `${t.secUptimeTitle} (${formatDateHuman(range.start, lang)} — ${formatDateHuman(range.end, lang)})`;
+                              })()}
+                        </h2>
+                        <span className="text-xs font-mono text-slate-400 dark:text-slate-500">
+                          {t.secUptimeSub}
+                        </span>
+                      </div>
+                    </div>
+                    {loading && (
+                      <span className="text-xs font-mono text-emerald-500 animate-pulse">
+                        {t.loadingPeriodData}
+                      </span>
+                    )}
+                  </div>
+
+                  <UptimeHistoryTab
+                    periodMode={periodMode}
+                    selectedDate={selectedDate}
+                    singleDayUptime={singleDayUptime}
+                    singleDayRows={tableRows && tableRows.length > 0 ? tableRows : chartData}
+                    periodStats={periodStats}
+                    isGridOnline={gridEpsInfo.isGridOnline}
+                    currentUptimeSec={currentUptimeSec}
+                    estimatedRemainingSec={powerSourceDurations.estimatedRemainingSec}
+                    timeToFullChargeSec={timeToFullChargeSec}
+                    battCharge={battCharge}
+                    onSelectDate={(d) => {
+                      setSelectedDate(d);
+                      setPeriodMode('1d');
+                    }}
+                    lang={lang}
+                  />
+                </section>
               </div>
             )}
 

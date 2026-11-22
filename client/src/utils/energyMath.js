@@ -548,3 +548,262 @@ export function calculateBatteryHealth(latestRow, liveData, status = null) {
     totalChgKwh: Number(totalChgKwh.toFixed(1)),
   };
 }
+
+/**
+ * Parses a "YYYY-MM-DD HH:mm:ss" timestamp string into ms since epoch and seconds since midnight.
+ */
+function parseTimePoint(timeStr) {
+  if (!timeStr || typeof timeStr !== 'string') return null;
+  const normalized = timeStr.trim().replace(/-/g, '/');
+  const d = new Date(normalized);
+  const ms = d.getTime();
+  if (Number.isNaN(ms)) return null;
+  const secOfDay = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+  return { ms, secOfDay };
+}
+
+/**
+ * Analyzes telemetry records (tableRows or day-chart points) to extract continuous
+ * Battery (EPS/off-grid) vs Grid operating intervals and summary runtime metrics.
+ */
+export function analyzePowerSourceHistory(items, dateStr = '') {
+  const emptyResult = {
+    totalBatterySec: 0,
+    totalGridSec: 0,
+    totalTrackedSec: 0,
+    batteryHours: 0,
+    gridHours: 0,
+    batterySharePct: 0,
+    gridSharePct: 0,
+    outagesCount: 0,
+    significantOutagesCount: 0,
+    longestBatterySec: 0,
+    longestGridSec: 0,
+    totalBatteryDischargeKwh: 0,
+    totalBatteryChargeKwh: 0,
+    totalGridImportKwh: 0,
+    totalConsumptionKwh: 0,
+    intervals: [],
+  };
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return emptyResult;
+  }
+
+  const parsedItems = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item || !item.time) continue;
+    const tInfo = parseTimePoint(item.time);
+    if (!tInfo) continue;
+
+    let isGrid = false;
+    if (item.vacr !== undefined) {
+      isGrid = (parseFloat(item.vacr) || 0) > 50;
+    } else if (item.gridPower !== undefined) {
+      const gp = Math.abs(parseFloat(item.gridPower) || 0);
+      const batRaw = parseFloat(item.batteryDischarging) || 0;
+      const pv = parseFloat(item.solarPv) || 0;
+      isGrid = gp > 0 || (batRaw < 0 && pv < Math.abs(batRaw));
+    } else {
+      const imp = parseFloat(item.gridImport ?? item.pToUser) || 0;
+      const chg = parseFloat(item.batteryCharge ?? item.pCharge) || 0;
+      const pv = parseFloat(item.solarPv ?? item.ppv) || 0;
+      isGrid = imp > 0 || chg > pv;
+    }
+
+    let loadW = 0;
+    if (item.consumption !== undefined) {
+      loadW = Math.max(0, parseFloat(item.consumption) || 0);
+    } else if (item.consumptionPower !== undefined && Number(item.consumptionPower) > 0) {
+      loadW = Number(item.consumptionPower);
+    } else {
+      const epsW = parseFloat(item.peps) || 0;
+      const directW = parseFloat(item.pLoad) || 0;
+      loadW = Math.max(0, epsW > 0 ? epsW : directW);
+    }
+
+    let batDisW = 0;
+    let batChgW = 0;
+    if (item.batteryDischarging !== undefined) {
+      const rawBatt = parseFloat(item.batteryDischarging) || 0;
+      batDisW = Math.max(0, rawBatt);
+      batChgW = Math.max(0, -rawBatt);
+    } else if (item.batteryDischarge !== undefined || item.batteryCharge !== undefined) {
+      batDisW = Math.max(0, parseFloat(item.batteryDischarge) || 0);
+      batChgW = Math.max(0, parseFloat(item.batteryCharge) || 0);
+    } else {
+      batDisW = Math.max(0, parseFloat(item.pDisCharge) || 0);
+      batChgW = Math.max(0, parseFloat(item.pCharge) || 0);
+    }
+
+    let gridW = 0;
+    if (item.gridPower !== undefined) {
+      gridW = Math.max(0, -(parseFloat(item.gridPower) || 0));
+    } else if (item.gridImport !== undefined) {
+      gridW = Math.max(0, parseFloat(item.gridImport) || 0);
+    } else {
+      gridW = Math.max(0, parseFloat(item.pToUser) || 0);
+    }
+
+    const soc = parseFloat(String(item.soc ?? 0).replace('%', '')) || 0;
+
+    parsedItems.push({
+      time: item.time,
+      ms: tInfo.ms,
+      secOfDay: tInfo.secOfDay,
+      mode: isGrid ? 'grid' : 'battery',
+      loadW,
+      batDisW,
+      batChgW,
+      gridW,
+      soc,
+    });
+  }
+
+  if (parsedItems.length === 0) {
+    return emptyResult;
+  }
+
+  parsedItems.sort((a, b) => a.ms - b.ms);
+
+  const rawGroups = [];
+  for (let i = 0; i < parsedItems.length; i++) {
+    const curr = parsedItems[i];
+    const next = i < parsedItems.length - 1 ? parsedItems[i + 1] : null;
+
+    let dtSec = 360;
+    let hasValidNext = false;
+    if (next) {
+      const diff = Math.floor((next.ms - curr.ms) / 1000);
+      if (diff > 0 && diff <= 1800) {
+        dtSec = diff;
+        hasValidNext = true;
+      }
+    }
+
+    const dtHours = dtSec / 3600;
+    const segLoadW = hasValidNext ? (curr.loadW + next.loadW) / 2 : curr.loadW;
+    const segBatDisW = hasValidNext ? (curr.batDisW + next.batDisW) / 2 : curr.batDisW;
+    const segBatChgW = hasValidNext ? (curr.batChgW + next.batChgW) / 2 : curr.batChgW;
+    const segGridW = hasValidNext ? (curr.gridW + next.gridW) / 2 : curr.gridW;
+
+    const segConsKwh = (segLoadW * dtHours) / 1000;
+    const segDisKwh = (segBatDisW * dtHours) / 1000;
+    const segChgKwh = (segBatChgW * dtHours) / 1000;
+    const segGridKwh = (segGridW * dtHours) / 1000;
+
+    const lastGroup = rawGroups[rawGroups.length - 1];
+    if (!lastGroup || lastGroup.mode !== curr.mode) {
+      rawGroups.push({
+        mode: curr.mode,
+        startTime: curr.time,
+        startSecOfDay: curr.secOfDay,
+        endTime: next ? next.time : curr.time,
+        endSoc: next ? next.soc : curr.soc,
+        startSoc: curr.soc,
+        durationSec: dtSec,
+        sumLoadWeighted: curr.loadW * dtSec,
+        maxLoadW: curr.loadW,
+        batteryDischargeKwh: segDisKwh,
+        batteryChargeKwh: segChgKwh,
+        gridImportKwh: segGridKwh,
+        consumptionKwh: segConsKwh,
+      });
+    } else {
+      lastGroup.endTime = next ? next.time : curr.time;
+      lastGroup.endSoc = next ? next.soc : curr.soc;
+      lastGroup.durationSec += dtSec;
+      lastGroup.sumLoadWeighted += curr.loadW * dtSec;
+      if (curr.loadW > lastGroup.maxLoadW) {
+        lastGroup.maxLoadW = curr.loadW;
+      }
+      lastGroup.batteryDischargeKwh += segDisKwh;
+      lastGroup.batteryChargeKwh += segChgKwh;
+      lastGroup.gridImportKwh += segGridKwh;
+      lastGroup.consumptionKwh += segConsKwh;
+    }
+  }
+
+  let totalBatterySec = 0;
+  let totalGridSec = 0;
+  let outagesCount = 0;
+  let significantOutagesCount = 0;
+  let longestBatterySec = 0;
+  let longestGridSec = 0;
+  let totalBatteryDischargeKwh = 0;
+  let totalBatteryChargeKwh = 0;
+  let totalGridImportKwh = 0;
+  let totalConsumptionKwh = 0;
+
+  const intervals = rawGroups.map((g) => {
+    const startPct = Math.max(0, Math.min(100, (g.startSecOfDay / 86400) * 100));
+    const widthPct = Math.max(0, Math.min(100 - startPct, (g.durationSec / 86400) * 100));
+    const avgLoadW = g.durationSec > 0 ? Math.round(g.sumLoadWeighted / g.durationSec) : 0;
+    const startSoc = Math.round(g.startSoc);
+    const endSoc = Math.round(g.endSoc);
+
+    if (g.mode === 'battery') {
+      totalBatterySec += g.durationSec;
+      outagesCount += 1;
+      if (g.durationSec >= 300) {
+        significantOutagesCount += 1;
+      }
+      if (g.durationSec > longestBatterySec) {
+        longestBatterySec = g.durationSec;
+      }
+    } else {
+      totalGridSec += g.durationSec;
+      if (g.durationSec > longestGridSec) {
+        longestGridSec = g.durationSec;
+      }
+    }
+
+    totalBatteryDischargeKwh += g.batteryDischargeKwh;
+    totalBatteryChargeKwh += g.batteryChargeKwh;
+    totalGridImportKwh += g.gridImportKwh;
+    totalConsumptionKwh += g.consumptionKwh;
+
+    return {
+      date: dateStr || String(g.startTime).slice(0, 10),
+      mode: g.mode,
+      startTime: g.startTime,
+      endTime: g.endTime,
+      startPct: Number(startPct.toFixed(3)),
+      widthPct: Number(widthPct.toFixed(3)),
+      durationSec: g.durationSec,
+      startSoc,
+      endSoc,
+      socDelta: endSoc - startSoc,
+      avgLoadW,
+      maxLoadW: Math.round(g.maxLoadW),
+      batteryDischargeKwh: parseFloat(g.batteryDischargeKwh.toFixed(2)),
+      batteryChargeKwh: parseFloat(g.batteryChargeKwh.toFixed(2)),
+      gridImportKwh: parseFloat(g.gridImportKwh.toFixed(2)),
+      consumptionKwh: parseFloat(g.consumptionKwh.toFixed(2)),
+    };
+  });
+
+  const totalTrackedSec = totalBatterySec + totalGridSec;
+  const batterySharePct = totalTrackedSec > 0 ? Math.round((totalBatterySec / totalTrackedSec) * 100) : 0;
+  const gridSharePct = totalTrackedSec > 0 ? 100 - batterySharePct : 0;
+
+  return {
+    totalBatterySec,
+    totalGridSec,
+    totalTrackedSec,
+    batteryHours: parseFloat((totalBatterySec / 3600).toFixed(2)),
+    gridHours: parseFloat((totalGridSec / 3600).toFixed(2)),
+    batterySharePct,
+    gridSharePct,
+    outagesCount,
+    significantOutagesCount,
+    longestBatterySec,
+    longestGridSec,
+    totalBatteryDischargeKwh: parseFloat(totalBatteryDischargeKwh.toFixed(2)),
+    totalBatteryChargeKwh: parseFloat(totalBatteryChargeKwh.toFixed(2)),
+    totalGridImportKwh: parseFloat(totalGridImportKwh.toFixed(2)),
+    totalConsumptionKwh: parseFloat(totalConsumptionKwh.toFixed(2)),
+    intervals,
+  };
+}
