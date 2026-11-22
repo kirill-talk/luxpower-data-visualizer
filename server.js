@@ -29,6 +29,7 @@ let cachedPlant = null;
 
 // Verified external session cookies allowed to read owner's LAN dongle when matching inverter SN
 const verifiedDongleCookies = new Map();
+const pendingCookieVerifications = new Map();
 const COOKIE_VERIFY_TTL_MS = 12 * 60 * 60 * 1000;
 
 function isExternalOrigin(req) {
@@ -68,17 +69,28 @@ async function isAuthorizedForDongle(req, customCookie, serial) {
   const expiresAt = verifiedDongleCookies.get(customCookie);
   if (expiresAt && Date.now() < expiresAt) return true;
 
-  try {
-    const reqClient = getClientForRequest(req);
-    const check = await reqClient.getInverterRuntime(dongleClient.inverterSn, customCookie);
-    if (check && check.success) {
-      verifiedDongleCookies.set(customCookie, Date.now() + COOKIE_VERIFY_TTL_MS);
-      return true;
-    }
-  } catch {
-    // Cookie invalid or expired for this inverter
+  if (pendingCookieVerifications.has(customCookie)) {
+    return pendingCookieVerifications.get(customCookie);
   }
-  return false;
+
+  const verifyPromise = (async () => {
+    try {
+      const reqClient = getClientForRequest(req);
+      const check = await reqClient.getInverterRuntime(dongleClient.inverterSn, customCookie);
+      if (check && check.success) {
+        verifiedDongleCookies.set(customCookie, Date.now() + COOKIE_VERIFY_TTL_MS);
+        return true;
+      }
+    } catch {
+      // Cookie invalid or expired for this inverter
+    } finally {
+      pendingCookieVerifications.delete(customCookie);
+    }
+    return false;
+  })();
+
+  pendingCookieVerifications.set(customCookie, verifyPromise);
+  return verifyPromise;
 }
 
 async function initLuxpower() {

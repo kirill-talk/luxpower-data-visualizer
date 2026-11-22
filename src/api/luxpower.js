@@ -107,16 +107,23 @@ class LuxpowerClient {
     if (!customCookie) {
       await this.ensureAuth();
     }
+    const isUnloginResponse = (r) =>
+      (typeof r === 'string' && r.includes('<!DOCTYPE')) ||
+      (r && typeof r === 'object' && r.msg === 'UNLOGIN_ERROR');
+
     try {
       const res = await fn();
-      // If table endpoint redirects to login HTML
-      if (typeof res === 'string' && res.includes('<!DOCTYPE')) {
+      // Handle HTML login redirects or HTTP 200 { msg: 'UNLOGIN_ERROR' } payloads
+      if (isUnloginResponse(res)) {
         if (!customCookie && this.account && this.password) {
-          console.log('🔄 Session expired (HTML login redirect detected). Re-authenticating...');
+          console.log('🔄 Session expired (login redirect / UNLOGIN_ERROR detected). Re-authenticating...');
           await this.login(this.account, this.password);
           const retryRes = await fn();
-          if (typeof retryRes === 'string' && retryRes.includes('<!DOCTYPE')) {
-            throw new Error('UNLOGIN_ERROR');
+          if (isUnloginResponse(retryRes)) {
+            const err = new Error('Session expired');
+            err.status = 401;
+            err._retried = true;
+            throw err;
           }
           return retryRes;
         }
@@ -131,7 +138,7 @@ class LuxpowerClient {
         err.response?.data?.msg === 'UNLOGIN_ERROR';
 
       if (isAuthError) {
-        if (!customCookie && this.account && this.password) {
+        if (!customCookie && !err._retried && this.account && this.password) {
           console.log('🔄 Session expired (401 / UNLOGIN_ERROR). Re-authenticating...');
           await this.login(this.account, this.password);
           return await fn();

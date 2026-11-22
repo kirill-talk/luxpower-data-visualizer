@@ -18,8 +18,13 @@ class LuxpowerDongleClient {
       ? Number(options.timezoneOffsetMinutes)
       : (Number(process.env.LUX_TIMEZONE_OFFSET ?? 2) * 60);
 
-    this.cacheTtlMs = options.cacheTtlMs || 10000;
-    this.timeoutMs = options.timeoutMs || 5000;
+    this.cacheTtlMs = options.cacheTtlMs || 15000;
+    this.timeoutMs = options.timeoutMs || 8000;
+    this.connectedTtlMs = options.connectedTtlMs || 120000;
+
+    this.socket = null;
+    this.rxBuffer = Buffer.alloc(0);
+    this.activePollDataHandler = null;
 
     this.cachedResult = null;
     this.lastSuccessAt = 0;
@@ -40,7 +45,20 @@ class LuxpowerDongleClient {
   }
 
   isConnected() {
-    return this.isConfigured() && this.lastSuccessAt > 0 && (Date.now() - this.lastSuccessAt < 60000);
+    return this.isConfigured() && this.lastSuccessAt > 0 && (Date.now() - this.lastSuccessAt < this.connectedTtlMs);
+  }
+
+  destroySocket() {
+    if (this.socket) {
+      try {
+        this.socket.destroy();
+      } catch {
+        // ignore socket destroy error
+      }
+      this.socket = null;
+    }
+    this.rxBuffer = Buffer.alloc(0);
+    this.activePollDataHandler = null;
   }
 
   setSerials({ datalogSn, inverterSn, timezoneOffsetMinutes } = {}) {
@@ -130,9 +148,9 @@ class LuxpowerDongleClient {
   }
 
   /**
-   * Reads the 3 Input Register banks (0..39, 40..79, 80..119) sequentially over TCP.
+   * Reads the 3 Input Register banks (0..39, 40..79, 80..119) sequentially over a persistent TCP socket.
    */
-  readAllInputBanks() {
+  readAllInputBanks(allowReconnectOnStale = true) {
     return new Promise((resolve, reject) => {
       if (!this.isConfigured()) {
         return reject(new Error('Dongle host or serial numbers not configured'));
@@ -141,63 +159,152 @@ class LuxpowerDongleClient {
       const banks = [0, 40, 80];
       const allRegs = Buffer.alloc(240);
       const gotBanks = new Set();
-      let rxBuffer = Buffer.alloc(0);
       let settled = false;
+      let pollTimer = null;
+      let retryTimer = null;
+      let staleTimer = null;
 
-      const sock = new net.Socket();
+      const isReusedSocket = !!(
+        this.socket &&
+        !this.socket.destroyed &&
+        this.socket.writable &&
+        !this.socket.connecting
+      );
+      let isConnected = isReusedSocket;
+      let sock = isReusedSocket ? this.socket : null;
+
+      if (!sock) {
+        this.destroySocket();
+        sock = new net.Socket();
+        sock.setKeepAlive(true, 10000);
+        this.socket = sock;
+
+        // Persistent lifecycle handlers prevent unhandled errors/leaks when idle between polls
+        sock.on('error', () => {
+          if (this.socket === sock) {
+            this.socket = null;
+            this.rxBuffer = Buffer.alloc(0);
+          }
+        });
+        sock.on('close', () => {
+          if (this.socket === sock) {
+            this.socket = null;
+            this.rxBuffer = Buffer.alloc(0);
+          }
+        });
+        sock.on('data', (chunk) => {
+          if (this.activePollDataHandler) {
+            this.activePollDataHandler(chunk);
+          }
+        });
+      } else {
+        this.rxBuffer = Buffer.alloc(0);
+      }
+
+      const cleanupPoll = () => {
+        if (pollTimer) {
+          clearTimeout(pollTimer);
+          pollTimer = null;
+        }
+        if (retryTimer) {
+          clearInterval(retryTimer);
+          retryTimer = null;
+        }
+        if (staleTimer) {
+          clearTimeout(staleTimer);
+          staleTimer = null;
+        }
+        this.activePollDataHandler = null;
+        sock.removeListener('connect', onConnect);
+        sock.removeListener('error', onError);
+        sock.removeListener('close', onClose);
+      };
+
       const finish = (err, buf) => {
         if (settled) return;
         settled = true;
-        sock.destroy();
-        if (err) reject(err);
-        else resolve(buf);
+        cleanupPoll();
+        if (err) {
+          if (this.socket === sock) {
+            this.destroySocket();
+          }
+          reject(err);
+        } else {
+          resolve(buf);
+        }
       };
 
-      sock.setTimeout(this.timeoutMs);
-
-      sock.on('timeout', () => {
-        finish(new Error(`Dongle TCP timeout after ${this.timeoutMs}ms (received banks: ${[...gotBanks].join(',') || 'none'})`));
-      });
-
-      sock.on('error', (err) => {
-        finish(err);
-      });
-
-      sock.on('close', () => {
-        if (!settled) {
-          finish(new Error('Dongle TCP socket closed before all register banks were read'));
+      const requestNextBank = () => {
+        if (settled || !isConnected || sock.destroyed || !sock.writable) return;
+        const nextBank = banks.find((b) => !gotBanks.has(b));
+        if (nextBank !== undefined) {
+          sock.write(this.buildReadInputPacket(nextBank, 40));
         }
-      });
+      };
 
-      sock.connect(this.port, this.host, () => {
-        sock.write(this.buildReadInputPacket(0, 40));
-      });
+      const scheduleRetry = () => {
+        if (retryTimer) clearInterval(retryTimer);
+        retryTimer = setInterval(() => {
+          requestNextBank();
+        }, 1500);
+      };
 
-      sock.on('data', (chunk) => {
-        rxBuffer = Buffer.concat([rxBuffer, chunk]);
+      const handleStaleOrError = (err) => {
+        if (settled) return;
+        if (isReusedSocket && gotBanks.size === 0 && allowReconnectOnStale) {
+          settled = true;
+          cleanupPoll();
+          if (this.socket === sock) {
+            this.destroySocket();
+          }
+          this.readAllInputBanks(false).then(resolve, reject);
+          return;
+        }
+        finish(err);
+      };
 
-        while (rxBuffer.length >= 6) {
-          if (rxBuffer[0] !== 0xa1 || rxBuffer[1] !== 0x1a) {
-            const magicIdx = rxBuffer.indexOf(Buffer.from([0xa1, 0x1a]), 1);
+      const onConnect = () => {
+        isConnected = true;
+        requestNextBank();
+        scheduleRetry();
+      };
+
+      const onError = (err) => {
+        handleStaleOrError(err);
+      };
+
+      const onClose = () => {
+        if (!settled) {
+          handleStaleOrError(new Error('Dongle TCP socket closed before all register banks were read'));
+        }
+      };
+
+      this.activePollDataHandler = (chunk) => {
+        if (settled) return;
+        this.rxBuffer = Buffer.concat([this.rxBuffer, chunk]);
+
+        while (this.rxBuffer.length >= 6) {
+          if (this.rxBuffer[0] !== 0xa1 || this.rxBuffer[1] !== 0x1a) {
+            const magicIdx = this.rxBuffer.indexOf(Buffer.from([0xa1, 0x1a]), 1);
             if (magicIdx === -1) {
-              rxBuffer = Buffer.alloc(0);
+              this.rxBuffer = Buffer.alloc(0);
               break;
             }
-            rxBuffer = rxBuffer.subarray(magicIdx);
-            if (rxBuffer.length < 6) break;
+            this.rxBuffer = this.rxBuffer.subarray(magicIdx);
+            if (this.rxBuffer.length < 6) break;
           }
 
-          const frameLen = rxBuffer.readUInt16LE(4);
+          const frameLen = this.rxBuffer.readUInt16LE(4);
           if (frameLen < 14 || frameLen > 1024) {
-            rxBuffer = rxBuffer.subarray(2);
+            this.rxBuffer = this.rxBuffer.subarray(2);
             continue;
           }
 
           const totalLen = 6 + frameLen;
-          if (rxBuffer.length < totalLen) break;
+          if (this.rxBuffer.length < totalLen) break;
 
-          const frame = rxBuffer.subarray(0, totalLen);
-          rxBuffer = rxBuffer.subarray(totalLen);
+          const frame = this.rxBuffer.subarray(0, totalLen);
+          this.rxBuffer = this.rxBuffer.subarray(totalLen);
 
           if (frame[7] !== 0xc2 || frame.length < 36) continue;
 
@@ -218,20 +325,47 @@ class LuxpowerDongleClient {
           const startReg = data.readUInt16LE(12);
           const byteCount = data[14];
           if (byteCount === 80 && banks.includes(startReg) && 15 + byteCount <= data.length) {
+            const isNewBank = !gotBanks.has(startReg);
             data.subarray(15, 15 + 80).copy(allRegs, startReg * 2);
             gotBanks.add(startReg);
+            if (staleTimer) {
+              clearTimeout(staleTimer);
+              staleTimer = null;
+            }
 
-            if (startReg === 0 && !gotBanks.has(40)) {
-              sock.write(this.buildReadInputPacket(40, 40));
-            } else if (startReg === 40 && !gotBanks.has(80)) {
-              sock.write(this.buildReadInputPacket(80, 40));
-            } else if (gotBanks.size === banks.length) {
+            if (gotBanks.size === banks.length) {
               finish(null, allRegs);
               return;
             }
+            if (isNewBank) {
+              requestNextBank();
+              scheduleRetry();
+            }
           }
         }
-      });
+      };
+
+      pollTimer = setTimeout(() => {
+        finish(new Error(`Dongle TCP timeout after ${this.timeoutMs}ms (received banks: ${[...gotBanks].join(',') || 'none'})`));
+      }, this.timeoutMs);
+
+      sock.on('error', onError);
+      sock.on('close', onClose);
+
+      if (isReusedSocket) {
+        requestNextBank();
+        scheduleRetry();
+        if (allowReconnectOnStale) {
+          staleTimer = setTimeout(() => {
+            if (!settled && gotBanks.size === 0) {
+              handleStaleOrError(new Error('Reused dongle TCP socket stale'));
+            }
+          }, 1800);
+        }
+      } else {
+        sock.on('connect', onConnect);
+        sock.connect(this.port, this.host);
+      }
     });
   }
 
@@ -616,8 +750,27 @@ class LuxpowerDongleClient {
   }
 
   async getLiveTelemetry() {
-    const snapshot = await this.pollSnapshot();
-    return snapshot.live;
+    if (this.cachedResult && this.isConnected()) {
+      if (Date.now() - this.lastSuccessAt >= this.cacheTtlMs) {
+        this.pollSnapshot().catch(() => {});
+      }
+      return this.cachedResult.live;
+    }
+
+    let timer = null;
+    try {
+      const snapshot = await Promise.race([
+        this.pollSnapshot(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            reject(new Error('Dongle live read exceeded 3500ms fast-path timeout'));
+          }, 3500);
+        }),
+      ]);
+      return snapshot.live;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   getTodayRows(dateStr) {
