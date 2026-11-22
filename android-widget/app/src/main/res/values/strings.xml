@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Luxpower АКБ</string>
+    <string name="widget_description">Заряд аккумулятора (%) и напряжение (В)</string>
+    <string name="widget_title">⚡ АКБ</string>
+    <string name="widget_placeholder_soc">--%</string>
+    <string name="widget_placeholder_voltage">--.- В</string>
+    <string name="widget_waiting">Нажмите ⚙ для настройки</string>
+    <string name="settings_title">Настройка виджета АКБ</string>
+    <string name="settings_subtitle">Отображение заряда (SOC %) и напряжения аккумулятора</string>
+    <string name="label_api_url">API URL сервера</string>
+    <string name="hint_api_url">https://luxpower-proxy.kirill-talk.workers.dev/api</string>
+    <string name="label_account">Luxpower Аккаунт (Логин)</string>
+    <string name="hint_account">Обязательно для облачного прокси</string>
+    <string name="label_password">Luxpower Пароль</string>
+    <string name="hint_password">Введите пароль</string>
+    <string name="label_serial">Серийный номер инвертора (SN)</string>
+    <string name="hint_serial">Опционально (заполнится при входе)</string>
+    <string name="btn_save_refresh">Сохранить и обновить виджет</string>
+    <string name="preview_title">Текущие данные АКБ</string>
+</resources>
