@@ -108,6 +108,31 @@ class BatteryWidgetProvider : AppWidgetProvider() {
             }
         }
 
+        fun stateIconRes(state: String): Int {
+            return when (state) {
+                WidgetPrefs.STATE_CHARGING -> R.drawable.ic_state_charging
+                WidgetPrefs.STATE_DISCHARGING -> R.drawable.ic_state_discharging
+                else -> R.drawable.ic_state_idle
+            }
+        }
+
+        fun etaColor(state: String): Int {
+            return when (state) {
+                WidgetPrefs.STATE_CHARGING -> Color.parseColor("#34D399")
+                WidgetPrefs.STATE_DISCHARGING -> Color.parseColor("#FBBF24")
+                else -> Color.parseColor("#94A3B8")
+            }
+        }
+
+        fun formatVoltageLine(voltage: String, state: String, powerW: Int, fallback: String): String {
+            if (voltage.isBlank()) return fallback
+            return when {
+                state == WidgetPrefs.STATE_CHARGING && powerW > 0 -> "$voltage В • +${powerW} Вт"
+                state == WidgetPrefs.STATE_DISCHARGING && powerW > 0 -> "$voltage В • -${powerW} Вт"
+                else -> "$voltage В"
+            }
+        }
+
         private fun updateWidgetsFromPrefs(
             context: Context,
             appWidgetManager: AppWidgetManager,
@@ -117,16 +142,24 @@ class BatteryWidgetProvider : AppWidgetProvider() {
             val soc = WidgetPrefs.getLastSoc(context)
             val voltage = WidgetPrefs.getLastVoltage(context)
             val updatedTime = WidgetPrefs.getLastUpdatedTime(context)
+            val state = WidgetPrefs.getLastState(context)
+            val eta = WidgetPrefs.getLastEta(context)
+            val powerW = WidgetPrefs.getLastPowerW(context)
             val lastError = WidgetPrefs.getLastError(context)
 
             val socText = if (soc >= 0) "$soc%" else context.getString(R.string.widget_placeholder_soc)
-            val voltageText = if (voltage.isNotBlank()) "$voltage В" else context.getString(R.string.widget_placeholder_voltage)
+            val voltageText = formatVoltageLine(
+                voltage = voltage,
+                state = state,
+                powerW = powerW,
+                fallback = context.getString(R.string.widget_placeholder_voltage)
+            )
             val progressVal = if (soc >= 0) soc.coerceIn(0, 100) else 0
 
             val statusText = when {
-                isLoading -> "Обновление..."
-                lastError.isNotBlank() -> "Ошибка: $lastError"
-                updatedTime.isNotBlank() -> "Обновлено $updatedTime"
+                isLoading -> "..."
+                lastError.isNotBlank() -> "Ош: $lastError"
+                updatedTime.isNotBlank() -> updatedTime
                 else -> context.getString(R.string.widget_waiting)
             }
 
@@ -152,8 +185,11 @@ class BatteryWidgetProvider : AppWidgetProvider() {
 
             for (appWidgetId in appWidgetIds) {
                 val views = RemoteViews(context.packageName, R.layout.widget_battery).apply {
+                    setImageViewResource(R.id.widget_state_icon, stateIconRes(state))
                     setTextViewText(R.id.widget_soc, socText)
                     setTextColor(R.id.widget_soc, socColor(soc))
+                    setTextViewText(R.id.widget_eta, eta)
+                    setTextColor(R.id.widget_eta, etaColor(state))
                     setTextViewText(R.id.widget_voltage, voltageText)
                     setProgressBar(R.id.widget_progress, 100, progressVal, false)
                     setTextViewText(R.id.widget_updated, statusText)

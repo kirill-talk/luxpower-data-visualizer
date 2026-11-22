@@ -7,6 +7,10 @@ object WidgetPrefs {
     private const val PREFS_NAME = "luxpower_widget_prefs"
     const val DEFAULT_API_URL = "https://luxpower-proxy.kirill-talk.workers.dev/api"
 
+    const val STATE_CHARGING = "charging"
+    const val STATE_DISCHARGING = "discharging"
+    const val STATE_IDLE = "idle"
+
     private const val KEY_API_URL = "api_base_url"
     private const val KEY_ACCOUNT = "account"
     private const val KEY_PASSWORD = "password"
@@ -15,6 +19,9 @@ object WidgetPrefs {
     private const val KEY_LAST_SOC = "last_soc"
     private const val KEY_LAST_VOLTAGE = "last_voltage"
     private const val KEY_LAST_UPDATED = "last_updated_time"
+    private const val KEY_LAST_STATE = "last_state"
+    private const val KEY_LAST_ETA = "last_eta"
+    private const val KEY_LAST_POWER_W = "last_power_w"
     private const val KEY_LAST_ERROR = "last_error"
 
     private fun prefs(context: Context): SharedPreferences =
@@ -51,6 +58,15 @@ object WidgetPrefs {
 
     fun getLastUpdatedTime(context: Context): String =
         prefs(context).getString(KEY_LAST_UPDATED, "") ?: ""
+
+    fun getLastState(context: Context): String =
+        prefs(context).getString(KEY_LAST_STATE, STATE_IDLE) ?: STATE_IDLE
+
+    fun getLastEta(context: Context): String =
+        prefs(context).getString(KEY_LAST_ETA, "") ?: ""
+
+    fun getLastPowerW(context: Context): Int =
+        prefs(context).getInt(KEY_LAST_POWER_W, 0)
 
     fun getLastError(context: Context): String =
         prefs(context).getString(KEY_LAST_ERROR, "") ?: ""
@@ -93,11 +109,22 @@ object WidgetPrefs {
         prefs(context).edit().remove(KEY_COOKIE).apply()
     }
 
-    fun saveTelemetry(context: Context, soc: Int, voltage: String, updatedTime: String) {
+    fun saveTelemetry(
+        context: Context,
+        soc: Int,
+        voltage: String,
+        updatedTime: String,
+        state: String,
+        eta: String,
+        powerW: Int
+    ) {
         prefs(context).edit()
             .putInt(KEY_LAST_SOC, soc)
             .putString(KEY_LAST_VOLTAGE, voltage)
             .putString(KEY_LAST_UPDATED, updatedTime)
+            .putString(KEY_LAST_STATE, state)
+            .putString(KEY_LAST_ETA, eta)
+            .putInt(KEY_LAST_POWER_W, powerW)
             .remove(KEY_LAST_ERROR)
             .apply()
     }

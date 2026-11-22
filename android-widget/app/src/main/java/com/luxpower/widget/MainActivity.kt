@@ -20,6 +20,7 @@ class MainActivity : Activity() {
     private lateinit var editSerial: EditText
     private lateinit var previewSoc: TextView
     private lateinit var previewVoltage: TextView
+    private lateinit var previewEta: TextView
     private lateinit var textStatus: TextView
     private lateinit var btnSaveRefresh: Button
 
@@ -42,6 +43,7 @@ class MainActivity : Activity() {
         editSerial = findViewById(R.id.edit_serial)
         previewSoc = findViewById(R.id.preview_soc)
         previewVoltage = findViewById(R.id.preview_voltage)
+        previewEta = findViewById(R.id.preview_eta)
         textStatus = findViewById(R.id.text_status)
         btnSaveRefresh = findViewById(R.id.btn_save_refresh)
 
@@ -61,11 +63,30 @@ class MainActivity : Activity() {
         val soc = WidgetPrefs.getLastSoc(this)
         val voltage = WidgetPrefs.getLastVoltage(this)
         val updated = WidgetPrefs.getLastUpdatedTime(this)
+        val state = WidgetPrefs.getLastState(this)
+        val eta = WidgetPrefs.getLastEta(this)
+        val powerW = WidgetPrefs.getLastPowerW(this)
         val error = WidgetPrefs.getLastError(this)
 
         previewSoc.text = if (soc >= 0) "$soc%" else getString(R.string.widget_placeholder_soc)
         previewSoc.setTextColor(BatteryWidgetProvider.socColor(soc))
-        previewVoltage.text = if (voltage.isNotBlank()) "$voltage В" else getString(R.string.widget_placeholder_voltage)
+        previewVoltage.text = BatteryWidgetProvider.formatVoltageLine(
+            voltage = voltage,
+            state = state,
+            powerW = powerW,
+            fallback = getString(R.string.widget_placeholder_voltage)
+        )
+
+        previewEta.setTextColor(BatteryWidgetProvider.etaColor(state))
+        previewEta.text = if (soc >= 0 && eta.isNotBlank()) {
+            when (state) {
+                WidgetPrefs.STATE_CHARGING -> "⚡ Заряд • $eta"
+                WidgetPrefs.STATE_DISCHARGING -> "↓ Разряд • $eta"
+                else -> eta
+            }
+        } else {
+            ""
+        }
 
         textStatus.text = when {
             error.isNotBlank() -> "Ошибка: $error"
