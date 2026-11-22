@@ -126,11 +126,7 @@ class BatteryWidgetProvider : AppWidgetProvider() {
 
         fun formatVoltageLine(voltage: String, state: String, powerW: Int, fallback: String): String {
             if (voltage.isBlank()) return fallback
-            return when {
-                state == WidgetPrefs.STATE_CHARGING && powerW > 0 -> "$voltage В • +${powerW} Вт"
-                state == WidgetPrefs.STATE_DISCHARGING && powerW > 0 -> "$voltage В • -${powerW} Вт"
-                else -> "$voltage В"
-            }
+            return "$voltage В"
         }
 
         private fun updateWidgetsFromPrefs(
@@ -156,11 +152,7 @@ class BatteryWidgetProvider : AppWidgetProvider() {
             )
             val progressVal = if (soc >= 0) soc.coerceIn(0, 100) else 0
 
-            val etaText = when {
-                state == WidgetPrefs.STATE_CHARGING && eta.startsWith("~") -> "Заряд $eta"
-                state == WidgetPrefs.STATE_DISCHARGING && eta.startsWith("~") -> "Разряд $eta"
-                else -> eta
-            }
+            val etaText = eta
 
             val statusText = when {
                 isLoading -> "..."
