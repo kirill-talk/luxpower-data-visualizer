@@ -248,7 +248,7 @@ export default function PeriodOverview({ periodStats, lang = 'uk' }) {
   return (
     <div className="flex flex-col gap-5 w-full">
       {/* 5 Summary KPI Modules for Period (including Inverter Loss / Consumption) */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-4">
         {/* KPI 1: Total Consumption & Average/Day */}
         <div className="bg-white dark:bg-[#111827]/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 dark:border-white/[0.08] shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between gap-1.5">

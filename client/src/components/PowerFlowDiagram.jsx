@@ -172,7 +172,10 @@ export default function PowerFlowDiagram({
                   </span>
                 </div>
                 {/* Secondary PV info hidden on mobile to avoid clutter */}
-                <div className="hidden sm:block text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
+                <div
+                  className="hidden sm:block text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5 cursor-help"
+                  title={isEn ? 'PV String 1 and String 2 DC voltages' : 'Напруга постійного струму на стрінгах PV1 та PV2'}
+                >
                   PV1: {pv1Voltage} {unitV} • PV2: {pv2Voltage} {unitV}
                 </div>
               </div>
@@ -429,13 +432,19 @@ export default function PowerFlowDiagram({
 
                   {/* Secondary grid specs hidden on small mobile screens */}
                   <div className="hidden sm:grid grid-cols-2 gap-1.5 mt-2 text-[10px] font-mono text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-white/[0.05]">
-                    <span>
+                    <span
+                      className="cursor-help"
+                      title={isEn ? 'Grid AC input voltage' : 'Напруга вхідної мережі змінного струму'}
+                    >
                       {isEn ? 'V:' : 'U:'}{' '}
                       <strong className="text-slate-700 dark:text-slate-200 font-semibold">
                         {gridVoltage} {unitV}
                       </strong>
                     </span>
-                    <span>
+                    <span
+                      className="cursor-help"
+                      title={isEn ? 'Grid AC frequency' : 'Частота вхідної мережі'}
+                    >
                       {isEn ? 'F:' : 'F:'}{' '}
                       <strong className="text-slate-700 dark:text-slate-200 font-semibold">
                         {gridFrequency} {unitHz}
@@ -478,7 +487,10 @@ export default function PowerFlowDiagram({
 
                   {/* Central Telemetry Grid */}
                   <div className="relative grid grid-cols-2 gap-1.5 sm:gap-2 mt-2 sm:mt-3 text-[10px] sm:text-[11px] font-mono">
-                    <div className="flex flex-col bg-slate-50 dark:bg-white/[0.04] p-1 sm:p-2 rounded-lg border border-slate-100 dark:border-white/[0.04]">
+                    <div
+                      className="flex flex-col bg-slate-50 dark:bg-white/[0.04] p-1 sm:p-2 rounded-lg border border-slate-100 dark:border-white/[0.04] cursor-help"
+                      title={isEn ? 'Inverter self-consumption and conversion losses' : 'Власне споживання інвертора та втрати перетворення'}
+                    >
                       <span className="text-[8px] sm:text-[9px] uppercase text-slate-400 font-semibold truncate">
                         {isEn ? 'Loss' : 'Власне'}
                       </span>
@@ -486,7 +498,10 @@ export default function PowerFlowDiagram({
                         ~{effectiveLoss} {unitW}
                       </span>
                     </div>
-                    <div className="flex flex-col bg-slate-50 dark:bg-white/[0.04] p-1 sm:p-2 rounded-lg border border-slate-100 dark:border-white/[0.04]">
+                    <div
+                      className="flex flex-col bg-slate-50 dark:bg-white/[0.04] p-1 sm:p-2 rounded-lg border border-slate-100 dark:border-white/[0.04] cursor-help"
+                      title={isEn ? 'Internal inverter temperature' : 'Внутрішня температура інвертора'}
+                    >
                       <span className="text-[8px] sm:text-[9px] uppercase text-slate-400 font-semibold truncate">
                         {isEn ? 'Temp' : 'Т інв.'}
                       </span>
@@ -498,13 +513,19 @@ export default function PowerFlowDiagram({
 
                   {/* Secondary specs hidden on mobile */}
                   <div className="hidden sm:flex relative items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400 mt-2.5 pt-2 border-t border-slate-100 dark:border-white/[0.05]">
-                    <span>
+                    <span
+                      className="cursor-help"
+                      title={isEn ? 'Output / Input energy conversion efficiency' : 'Коефіцієнт корисної дії перетворення енергії'}
+                    >
                       {isEn ? 'Efficiency:' : 'Ефективність:'}{' '}
                       <strong className="text-purple-600 dark:text-purple-400 font-semibold">
                         {efficiency}
                       </strong>
                     </span>
-                    <span className="text-purple-600 dark:text-purple-400 font-semibold">
+                    <span
+                      className="text-purple-600 dark:text-purple-400 font-semibold cursor-help"
+                      title={isEn ? 'Grid connection status' : 'Статус підключення до мережі'}
+                    >
                       {isGridOnline ? (isEn ? 'Online' : 'Онлайн') : (isEn ? 'Offgrid' : 'Автономія')}
                     </span>
                   </div>
@@ -542,13 +563,19 @@ export default function PowerFlowDiagram({
 
                   {/* Secondary load specs hidden on small mobile screens */}
                   <div className="hidden sm:grid grid-cols-2 gap-1.5 mt-2 text-[10px] font-mono text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-white/[0.05]">
-                    <span>
+                    <span
+                      className="cursor-help"
+                      title={isEn ? 'Inverter EPS output AC voltage' : 'Вихідна напруга EPS / навантаження'}
+                    >
                       EPS:{' '}
                       <strong className="text-slate-700 dark:text-slate-200 font-semibold">
                         {gridVoltage} {unitV}
                       </strong>
                     </span>
-                    <span>
+                    <span
+                      className="cursor-help"
+                      title={isEn ? 'Percentage of rated inverter power (6 kW)' : 'Відсоток завантаження від номінальної потужності інвертора (6 кВт)'}
+                    >
                       {isEn ? 'Load:' : 'Рівень:'}{' '}
                       <strong className="text-slate-700 dark:text-slate-200 font-semibold">
                         {loadPercent}%
@@ -642,7 +669,10 @@ export default function PowerFlowDiagram({
                 </div>
                 {/* Secondary battery specs hidden on small mobile screens */}
                 <div className="hidden sm:flex items-center justify-between gap-2 text-[10px] font-mono text-slate-500 dark:text-slate-400 mt-1 pt-1.5 border-t border-slate-100 dark:border-white/[0.05]">
-                  <span className="whitespace-nowrap">
+                  <span
+                    className="whitespace-nowrap cursor-help"
+                    title={isEn ? 'Current battery DC amperage' : 'Поточний струм заряду / розряду батареї'}
+                  >
                     {isEn ? 'Current:' : 'Струм:'}{' '}
                     <strong className={`font-semibold ${isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-400'}`}>
                       {isCharging ? `+${batteryCurrent}` : isDischarging ? `-${batteryCurrent}` : '0.0'} A
@@ -657,7 +687,10 @@ export default function PowerFlowDiagram({
                     )}
                   </BatteryModulesPopup>
                   <span>•</span>
-                  <span className="whitespace-nowrap">
+                  <span
+                    className="whitespace-nowrap cursor-help"
+                    title={isEn ? 'Average battery State of Health (SOH)' : 'Середній залишковий ресурс батареї (SOH)'}
+                  >
                     SOH: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{avgSoh}%</strong>
                   </span>
                 </div>

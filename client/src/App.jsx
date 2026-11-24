@@ -608,6 +608,17 @@ export default function App() {
     return Number.isFinite(capAh) && capAh > 0 ? capAh * 51.2 : 7680;
   }, [liveData?.batCapacity]);
 
+  const remainingBatteryKwh = useMemo(() => {
+    const socNum = Math.max(0, Math.min(100, parseFloat(soc) || 0));
+    return ((socNum / 100) * (batteryCapacityWh / 1000)).toFixed(2);
+  }, [soc, batteryCapacityWh]);
+
+  const usableBatteryKwh = useMemo(() => {
+    const socNum = Math.max(0, Math.min(100, parseFloat(soc) || 0));
+    const usableSoc = Math.max(0, socNum - 15);
+    return ((usableSoc / 100) * (batteryCapacityWh / 1000)).toFixed(2);
+  }, [soc, batteryCapacityWh]);
+
   // Power source durations (battery vs grid streak, estimated remaining runtime and 24h totals)
   const powerSourceDurations = useMemo(() => {
     return calculatePowerSourceDurations(tableRows, gridEpsInfo.isGridOnline, soc, batteryCapacityWh);
@@ -1051,6 +1062,7 @@ export default function App() {
                     timeToFullChargeSec={timeToFullChargeSec}
                     dailyChg={dailyChg}
                     dailyDisChg={dailyDisChg}
+                    batteryCapacityWh={batteryCapacityWh}
                     gridImport={gridImport}
                     gridVoltage={gridEpsInfo.voltage}
                     gridFrequency={gridEpsInfo.frequency}
@@ -1095,7 +1107,10 @@ export default function App() {
                         {formatDurationHuman(currentUptimeSec, lang === 'en', true)}
                       </span>
                       {!gridEpsInfo.isGridOnline && powerSourceDurations.estimatedRemainingSec !== null && (
-                        <div className="flex flex-col items-end">
+                        <div
+                          className="flex flex-col items-end cursor-help"
+                          title={lang === 'en' ? 'Estimated remaining battery runtime until 15% BMS cutoff' : 'Орієнтовний залишок часу роботи від АКБ до відсічення BMS (15% SOC)'}
+                        >
                           <span className="text-[10px] font-mono uppercase text-slate-400">
                             {t.estRemaining}
                           </span>
@@ -1106,12 +1121,18 @@ export default function App() {
                       )}
                     </div>
                     <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3 text-slate-500 dark:text-slate-400">
-                      <div className="flex items-center gap-1.5">
+                      <div
+                        className="flex items-center gap-1.5 cursor-help"
+                        title={lang === 'en' ? 'Total time on battery today (24h)' : 'Загальний час роботи від АКБ за добу'}
+                      >
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                         <span>{lang === 'en' ? '24h Bat' : 'АКБ 24г'}: <strong className="font-semibold text-slate-700 dark:text-slate-300">{formatDurationHuman(powerSourceDurations.totalBatterySec, lang === 'en', false)}</strong></span>
                       </div>
                       <span className="text-slate-300 dark:text-slate-600">•</span>
-                      <div className="flex items-center gap-1.5">
+                      <div
+                        className="flex items-center gap-1.5 cursor-help"
+                        title={lang === 'en' ? 'Total time on grid today (24h)' : 'Загальний час роботи від мережі за добу'}
+                      >
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                         <span>{lang === 'en' ? '24h Grid' : 'Мережа 24г'}: <strong className="font-semibold text-slate-700 dark:text-slate-300">{formatDurationHuman(powerSourceDurations.totalGridSec, lang === 'en', false)}</strong></span>
                       </div>
@@ -1142,17 +1163,31 @@ export default function App() {
                     </div>
                     <div className="flex items-center justify-between gap-2 my-3">
                       <div className="flex items-baseline gap-2">
-                        <span className={`font-mono text-3xl font-extrabold tracking-tight font-tabular ${
-                          battCharge > 0 ? 'text-emerald-500' : (battDischarge > 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white')
-                        }`}>
-                          {soc}%
+                        <span
+                          className={`font-mono text-3xl font-extrabold tracking-tight font-tabular cursor-help ${
+                            battCharge > 0 ? 'text-emerald-500' : (battDischarge > 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white')
+                          }`}
+                          title={lang === 'en'
+                            ? `Remaining energy: ${remainingBatteryKwh} of ${(batteryCapacityWh / 1000).toFixed(2)} kWh (usable above 15% cutoff: ${usableBatteryKwh} kWh)`
+                            : `Залишок енергії: ${remainingBatteryKwh} з ${(batteryCapacityWh / 1000).toFixed(2)} кВт·год (корисно до 15%: ${usableBatteryKwh} кВт·год)`}
+                        >
+                          {remainingBatteryKwh}
                         </span>
-                        <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                          {battCharge > 0 ? `(${t.chargeWord} ${battCharge} ${unitW})` : (battDischarge > 0 ? `(${t.dischargeWord} ${battDischarge} ${unitW})` : `(${t.standby})`)}
+                        <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{unitKwh}</span>
+                        <span
+                          className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 cursor-help"
+                          title={lang === 'en'
+                            ? `State of Charge: ${soc}% (usable above 15% BMS cutoff: ${usableBatteryKwh} kWh)`
+                            : `Рівень заряду (SOC): ${soc}% (корисна ємність до 15%: ${usableBatteryKwh} кВт·год)`}
+                        >
+                          {soc}%
                         </span>
                       </div>
                       {battCharge > 0 && timeToFullChargeSec !== null && (
-                        <div className="flex flex-col items-end">
+                        <div
+                          className="flex flex-col items-end cursor-help"
+                          title={lang === 'en' ? 'Estimated time until 100% SOC' : 'Орієнтовний час до повного заряду (100% SOC)'}
+                        >
                           <span className="text-[10px] font-mono uppercase text-slate-400">
                             {t.estTimeToFull}
                           </span>
@@ -1163,8 +1198,25 @@ export default function App() {
                       )}
                     </div>
                     <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3">
-                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">+{dailyChg} {unitKwh}</span>
-                      <span className="text-rose-500 dark:text-rose-400 font-semibold">-{dailyDisChg} {unitKwh}</span>
+                      <span
+                        className="cursor-help text-slate-500 dark:text-slate-400"
+                        title={lang === 'en'
+                          ? `Daily battery charge (+${dailyChg} ${unitKwh}) / discharge (-${dailyDisChg} ${unitKwh})`
+                          : `Заряд (+${dailyChg} ${unitKwh}) / розряд (-${dailyDisChg} ${unitKwh}) за добу`}
+                      >
+                        <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">+{dailyChg}</strong>
+                        {' / '}
+                        <strong className="text-rose-500 dark:text-rose-400 font-semibold">-{dailyDisChg}</strong>
+                        {' '}{unitKwh}
+                      </span>
+                      <span
+                        className={`font-semibold cursor-help ${
+                          battCharge > 0 ? 'text-emerald-600 dark:text-emerald-400' : (battDischarge > 0 ? 'text-rose-500 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400')
+                        }`}
+                        title={lang === 'en' ? 'Current battery charge/discharge power' : 'Поточна потужність заряду / розряду АКБ'}
+                      >
+                        {battCharge > 0 ? `+${battCharge} ${unitW}` : (battDischarge > 0 ? `-${battDischarge} ${unitW}` : `0 ${unitW}`)}
+                      </span>
                     </div>
                   </div>
 
@@ -1190,11 +1242,19 @@ export default function App() {
                     </div>
                     <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-white/[0.06] pt-3">
                       <span className={`w-2 h-2 rounded-full ${gridEpsInfo.isGridOnline ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]' : 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]'}`}></span>
-                      <span className={`font-medium ${gridEpsInfo.isGridOnline ? 'text-slate-700 dark:text-slate-300' : 'text-rose-600 dark:text-rose-400'}`}>
+                      <span
+                        className={`font-medium cursor-help ${gridEpsInfo.isGridOnline ? 'text-slate-700 dark:text-slate-300' : 'text-rose-600 dark:text-rose-400'}`}
+                        title={lang === 'en' ? 'Current grid AC voltage and frequency' : 'Поточна напруга та частота вхідної мережі'}
+                      >
                         {gridEpsInfo.isGridOnline ? `${gridEpsInfo.voltage} ${unitV} • ${gridEpsInfo.frequency} ${unitHz}` : t.gridOffline}
                       </span>
                       <span>•</span>
-                      <span>{t.dayTotal}: <span className="text-slate-900 dark:text-white font-semibold">{dailyGridImport} {unitKwh}</span></span>
+                      <span
+                        className="cursor-help"
+                        title={lang === 'en' ? 'Total energy imported from grid today' : 'Загальне споживання з мережі за добу'}
+                      >
+                        {t.dayTotal}: <span className="text-slate-900 dark:text-white font-semibold">{dailyGridImport} {unitKwh}</span>
+                      </span>
                     </div>
                   </div>
 
@@ -1215,11 +1275,17 @@ export default function App() {
                       <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{unitW}</span>
                     </div>
                     <div className="flex items-center justify-between text-[11px] font-mono border-t border-slate-100 dark:border-white/[0.06] pt-3">
-                      <div className="flex items-center gap-1 text-purple-500 dark:text-purple-400 font-semibold">
+                      <div
+                        className="flex items-center gap-1 text-purple-500 dark:text-purple-400 font-semibold cursor-help"
+                        title={lang === 'en' ? 'Internal inverter temperature' : 'Внутрішня температура інвертора'}
+                      >
                         <Flame className="w-3.5 h-3.5 text-purple-500" />
                         <span>{liveInverterTemp !== undefined ? `${liveInverterTemp}°C` : '--'}</span>
                       </div>
-                      <span className="text-slate-500 dark:text-slate-400">
+                      <span
+                        className="text-slate-500 dark:text-slate-400 cursor-help"
+                        title={lang === 'en' ? 'Current inverter operating mode' : 'Поточний режим роботи інвертора'}
+                      >
                         {gridEpsInfo.isGridOnline ? t.bypassCharging : t.epsMode}
                       </span>
                     </div>

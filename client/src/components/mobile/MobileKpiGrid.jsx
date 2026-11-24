@@ -26,6 +26,7 @@ export default function MobileKpiGrid({
   timeToFullChargeSec = null,
   dailyChg = '0',
   dailyDisChg = '0',
+  batteryCapacityWh = 7680,
   gridImport = 0,
   gridVoltage = 220,
   gridFrequency = 50,
@@ -43,6 +44,9 @@ export default function MobileKpiGrid({
 
   const isCharging = battCharge > 0;
   const isDischarging = battDischarge > 0;
+  const socNum = Math.max(0, Math.min(100, parseFloat(soc) || 0));
+  const remainingBatteryKwh = ((socNum / 100) * (batteryCapacityWh / 1000)).toFixed(2);
+  const usableBatteryKwh = ((Math.max(0, socNum - 15) / 100) * (batteryCapacityWh / 1000)).toFixed(2);
 
   return (
     <div className="grid grid-cols-2 gap-2.5">
@@ -73,20 +77,29 @@ export default function MobileKpiGrid({
               {formatDurationHuman(currentUptimeSec, isEn, true)}
             </span>
             {!isGridOnline && estimatedRemainingSec !== null && (
-              <span className="font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+              <span
+                className="font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400 cursor-help"
+                title={isEn ? 'Estimated remaining battery runtime until 15% BMS cutoff' : 'Орієнтовний залишок часу роботи від АКБ до 15% SOC'}
+              >
                 ~{formatDurationHuman(estimatedRemainingSec, isEn, false)}
               </span>
             )}
           </div>
         </div>
         <div className="flex flex-col gap-0.5 pt-1.5 border-t border-slate-100 dark:border-white/[0.05]">
-          <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400">
+          <div
+            className="flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400 cursor-help"
+            title={isEn ? 'Total time on battery today (24h)' : 'Загальний час роботи від АКБ за добу'}
+          >
             <span>{isEn ? '24h Bat' : 'АКБ за добу'}:</span>
             <span className="font-semibold text-amber-600 dark:text-amber-400">
               {formatDurationHuman(totalBatterySec, isEn, false)}
             </span>
           </div>
-          <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400">
+          <div
+            className="flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400 cursor-help"
+            title={isEn ? 'Total time on grid today (24h)' : 'Загальний час роботи від мережі за добу'}
+          >
             <span>{isEn ? '24h Grid' : 'Мережа за добу'}:</span>
             <span className="font-semibold text-emerald-600 dark:text-emerald-400">
               {formatDurationHuman(totalGridSec, isEn, false)}
@@ -105,7 +118,10 @@ export default function MobileKpiGrid({
             {t.kpiBattery}
           </span>
           {isCharging && timeToFullChargeSec !== null ? (
-            <span className="font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+            <span
+              className="font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap cursor-help"
+              title={isEn ? 'Estimated time until 100% SOC' : 'Орієнтовний час до повного заряду (100% SOC)'}
+            >
               ~{formatDurationHuman(timeToFullChargeSec, isEn, false)}
             </span>
           ) : (
@@ -127,23 +143,46 @@ export default function MobileKpiGrid({
         <div className="my-1.5">
           <div className="flex items-center justify-between gap-1">
             <div className="flex items-baseline gap-1">
-              <span className={`font-mono text-2xl font-bold font-tabular ${
-                isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-700 dark:text-slate-200'
-              }`}>
-                {soc}%
+              <span
+                className={`font-mono text-2xl font-bold font-tabular cursor-help ${
+                  isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-700 dark:text-slate-200'
+                }`}
+                title={isEn
+                  ? `Remaining energy: ${remainingBatteryKwh} of ${(batteryCapacityWh / 1000).toFixed(2)} kWh (usable above 15%: ${usableBatteryKwh} kWh)`
+                  : `Залишок енергії: ${remainingBatteryKwh} з ${(batteryCapacityWh / 1000).toFixed(2)} кВт·год (корисно до 15%: ${usableBatteryKwh} кВт·год)`}
+              >
+                {remainingBatteryKwh}
               </span>
-              <span className={`font-mono text-[10px] font-semibold truncate ${
-                isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-400'
-              }`}>
-                {battCharge > 0 ? `+${battCharge} ${unitW}` : (battDischarge > 0 ? `-${battDischarge} ${unitW}` : `0 ${unitW}`)}
+              <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{unitKwh}</span>
+              <span
+                className="font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 ml-0.5 cursor-help"
+                title={isEn
+                  ? `State of Charge: ${soc}% (usable above 15% BMS cutoff: ${usableBatteryKwh} kWh)`
+                  : `Рівень заряду (SOC): ${soc}% (корисна ємність до 15%: ${usableBatteryKwh} кВт·год)`}
+              >
+                {soc}%
               </span>
             </div>
           </div>
         </div>
-        <div className="flex flex-col gap-0.5 pt-1.5 border-t border-slate-100 dark:border-white/[0.05]">
-          <span className="text-[9px] font-mono text-slate-400 uppercase truncate">{t.chargeDischarge}</span>
-          <span className="font-mono text-[10px] text-slate-700 dark:text-slate-200 tracking-tight">
-            +{dailyChg} / -{dailyDisChg} {unitKwh}
+        <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-slate-100 dark:border-white/[0.05] font-mono text-[10px]">
+          <span
+            className="text-slate-500 dark:text-slate-400 truncate cursor-help"
+            title={isEn
+              ? `Daily battery charge (+${dailyChg} ${unitKwh}) / discharge (-${dailyDisChg} ${unitKwh})`
+              : `Заряд (+${dailyChg} ${unitKwh}) / розряд (-${dailyDisChg} ${unitKwh}) за добу`}
+          >
+            <strong className="text-emerald-600 dark:text-emerald-400">+{dailyChg}</strong>
+            {' / '}
+            <strong className="text-rose-500 dark:text-rose-400">-{dailyDisChg}</strong>
+          </span>
+          <span
+            className={`font-semibold shrink-0 cursor-help ${
+              isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-400'
+            }`}
+            title={isEn ? 'Current battery charge/discharge power' : 'Поточна потужність заряду / розряду АКБ'}
+          >
+            {battCharge > 0 ? `+${battCharge} ${unitW}` : (battDischarge > 0 ? `-${battDischarge} ${unitW}` : `0 ${unitW}`)}
           </span>
         </div>
       </div>
@@ -168,11 +207,17 @@ export default function MobileKpiGrid({
           </div>
         </div>
         <div className="flex flex-col gap-0.5 pt-1.5 border-t border-slate-100 dark:border-white/[0.05]">
-          <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+          <div
+            className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 cursor-help"
+            title={isEn ? 'Current grid AC voltage and frequency' : 'Поточна напруга та частота вхідної мережі'}
+          >
             <span className={`w-1.5 h-1.5 rounded-full ${isGridOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} />
             <span className="truncate">{isGridOnline ? `${gridVoltage} ${unitV} • ${gridFrequency} ${unitHz}` : t.gridOffline}</span>
           </div>
-          <span className="font-mono text-[10px] text-slate-600 dark:text-slate-300">
+          <span
+            className="font-mono text-[10px] text-slate-600 dark:text-slate-300 cursor-help"
+            title={isEn ? 'Total energy imported from grid today' : 'Загальне споживання з мережі за добу'}
+          >
             {t.dayTotal}: {dailyGridImport} {unitKwh}
           </span>
         </div>
@@ -198,11 +243,17 @@ export default function MobileKpiGrid({
           </div>
         </div>
         <div className="flex flex-col gap-0.5 pt-1.5 border-t border-slate-100 dark:border-white/[0.05]">
-          <div className="flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-300">
+          <div
+            className="flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-300 cursor-help"
+            title={isEn ? 'Internal inverter temperature' : 'Внутрішня температура інвертора'}
+          >
             <Flame className="w-3 h-3 text-rose-500" />
             <span>{inverterTemp !== '--' ? `${inverterTemp}°C` : '--'}</span>
           </div>
-          <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 truncate">
+          <span
+            className="font-mono text-[10px] text-slate-500 dark:text-slate-400 truncate cursor-help"
+            title={isEn ? 'Current inverter operating mode' : 'Поточний режим роботи інвертора'}
+          >
             {isGridOnline ? t.bypassCharging : t.epsMode}
           </span>
         </div>
