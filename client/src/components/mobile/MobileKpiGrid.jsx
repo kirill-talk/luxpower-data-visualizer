@@ -26,7 +26,7 @@ export default function MobileKpiGrid({
   timeToFullChargeSec = null,
   dailyChg = '0',
   dailyDisChg = '0',
-  batteryCapacityWh = 7680,
+  batteryCapacityWh = 7200,
   gridImport = 0,
   gridVoltage = 220,
   gridFrequency = 50,
@@ -47,6 +47,7 @@ export default function MobileKpiGrid({
   const socNum = Math.max(0, Math.min(100, parseFloat(soc) || 0));
   const remainingBatteryKwh = ((socNum / 100) * (batteryCapacityWh / 1000)).toFixed(2);
   const usableBatteryKwh = ((Math.max(0, socNum - 15) / 100) * (batteryCapacityWh / 1000)).toFixed(2);
+  const maxUsableBatteryKwh = ((0.85 * batteryCapacityWh) / 1000).toFixed(2);
 
   return (
     <div className="grid grid-cols-2 gap-2.5">
@@ -148,17 +149,17 @@ export default function MobileKpiGrid({
                   isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-700 dark:text-slate-200'
                 }`}
                 title={isEn
-                  ? `Remaining energy: ${remainingBatteryKwh} of ${(batteryCapacityWh / 1000).toFixed(2)} kWh (usable above 15%: ${usableBatteryKwh} kWh)`
-                  : `Залишок енергії: ${remainingBatteryKwh} з ${(batteryCapacityWh / 1000).toFixed(2)} кВт·год (корисно до 15%: ${usableBatteryKwh} кВт·год)`}
+                  ? `Usable remaining: ${usableBatteryKwh} of ${maxUsableBatteryKwh} kWh (15% Cut-Off SOC) • Nominal: ${remainingBatteryKwh} of ${(batteryCapacityWh / 1000).toFixed(2)} kWh`
+                  : `Доступний залишок: ${usableBatteryKwh} з ${maxUsableBatteryKwh} кВт·год (до 15% Cut-Off SOC) • Номінал: ${remainingBatteryKwh} з ${(batteryCapacityWh / 1000).toFixed(2)} кВт·год`}
               >
-                {remainingBatteryKwh}
+                {usableBatteryKwh}
               </span>
               <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{unitKwh}</span>
               <span
                 className="font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 ml-0.5 cursor-help"
                 title={isEn
-                  ? `State of Charge: ${soc}% (usable above 15% BMS cutoff: ${usableBatteryKwh} kWh)`
-                  : `Рівень заряду (SOC): ${soc}% (корисна ємність до 15%: ${usableBatteryKwh} кВт·год)`}
+                  ? `State of Charge: ${soc}% (usable above 15% Cut-Off SOC: ${Math.max(0, Math.round(socNum - 15))}%)`
+                  : `Рівень заряду (SOC): ${soc}% (корисно до 15% Cut-Off SOC: ${Math.max(0, Math.round(socNum - 15))}%)`}
               >
                 {soc}%
               </span>

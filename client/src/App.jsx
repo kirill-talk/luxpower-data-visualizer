@@ -605,7 +605,7 @@ export default function App() {
 
   const batteryCapacityWh = useMemo(() => {
     const capAh = parseFloat(liveData?.batCapacity);
-    return Number.isFinite(capAh) && capAh > 0 ? capAh * 51.2 : 7680;
+    return Number.isFinite(capAh) && capAh > 0 ? capAh * 48 : 7200;
   }, [liveData?.batCapacity]);
 
   const remainingBatteryKwh = useMemo(() => {
@@ -618,6 +618,10 @@ export default function App() {
     const usableSoc = Math.max(0, socNum - 15);
     return ((usableSoc / 100) * (batteryCapacityWh / 1000)).toFixed(2);
   }, [soc, batteryCapacityWh]);
+
+  const maxUsableBatteryKwh = useMemo(() => {
+    return ((0.85 * batteryCapacityWh) / 1000).toFixed(2);
+  }, [batteryCapacityWh]);
 
   // Power source durations (battery vs grid streak, estimated remaining runtime and 24h totals)
   const powerSourceDurations = useMemo(() => {
@@ -1168,17 +1172,17 @@ export default function App() {
                             battCharge > 0 ? 'text-emerald-500' : (battDischarge > 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white')
                           }`}
                           title={lang === 'en'
-                            ? `Remaining energy: ${remainingBatteryKwh} of ${(batteryCapacityWh / 1000).toFixed(2)} kWh (usable above 15% cutoff: ${usableBatteryKwh} kWh)`
-                            : `Залишок енергії: ${remainingBatteryKwh} з ${(batteryCapacityWh / 1000).toFixed(2)} кВт·год (корисно до 15%: ${usableBatteryKwh} кВт·год)`}
+                            ? `Usable remaining: ${usableBatteryKwh} of ${maxUsableBatteryKwh} kWh (15% Cut-Off SOC) • Nominal: ${remainingBatteryKwh} of ${(batteryCapacityWh / 1000).toFixed(2)} kWh`
+                            : `Доступний залишок: ${usableBatteryKwh} з ${maxUsableBatteryKwh} кВт·год (до 15% Cut-Off SOC) • Номінал: ${remainingBatteryKwh} з ${(batteryCapacityWh / 1000).toFixed(2)} кВт·год`}
                         >
-                          {remainingBatteryKwh}
+                          {usableBatteryKwh}
                         </span>
                         <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{unitKwh}</span>
                         <span
                           className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 cursor-help"
                           title={lang === 'en'
-                            ? `State of Charge: ${soc}% (usable above 15% BMS cutoff: ${usableBatteryKwh} kWh)`
-                            : `Рівень заряду (SOC): ${soc}% (корисна ємність до 15%: ${usableBatteryKwh} кВт·год)`}
+                            ? `State of Charge: ${soc}% (usable above 15% Cut-Off SOC: ${Math.max(0, Math.round((parseFloat(soc) || 0) - 15))}%)`
+                            : `Рівень заряду (SOC): ${soc}% (корисно до 15% Cut-Off SOC: ${Math.max(0, Math.round((parseFloat(soc) || 0) - 15))}%)`}
                         >
                           {soc}%
                         </span>
