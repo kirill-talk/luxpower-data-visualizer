@@ -15,7 +15,7 @@ import kotlin.math.roundToLong
 
 object LuxpowerApiClient {
     private const val TIMEOUT_MS = 8000
-    private const val TOTAL_CAPACITY_WH = 5120.0
+    private const val TOTAL_CAPACITY_WH = 7680.0
     private const val BMS_CUTOFF_SOC = 15
 
     data class LoginResult(

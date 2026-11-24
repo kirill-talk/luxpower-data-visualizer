@@ -258,7 +258,7 @@ export function normalizeGridAndEps(liveData, latestRow) {
  * Calculates current operating mode duration, daily totals (battery vs grid),
  * and estimated remaining runtime on battery based on average discharge/consumption during the outage.
  */
-export function calculatePowerSourceDurations(tableRows, isCurrentGridOnline, currentSoc = null) {
+export function calculatePowerSourceDurations(tableRows, isCurrentGridOnline, currentSoc = null, totalCapacityWh = 7680) {
   if (!tableRows || !tableRows.length) {
     return {
       currentModeSince: null,
@@ -358,9 +358,8 @@ export function calculatePowerSourceDurations(tableRows, isCurrentGridOnline, cu
       const hoursRemaining = burnRatePerHour > 0 ? usableSoc / burnRatePerHour : 0;
       estimatedRemainingSec = Math.round(hoursRemaining * 3600);
     } else if (avgConsumptionDuringOutage > 0) {
-      // Approach B: Capacity energy model (nominal 100Ah/200Ah ~ 5.12kWh-10kWh, default ~5000Wh)
-      // Wh remaining = (usableSoc / 100) * 5120Wh
-      const remainingWh = (usableSoc / 100) * 5120;
+      // Approach B: Capacity energy model (nominal 51.2V 150Ah ~ 7.68kWh)
+      const remainingWh = (usableSoc / 100) * totalCapacityWh;
       const hoursRemaining = remainingWh / avgConsumptionDuringOutage;
       estimatedRemainingSec = Math.round(hoursRemaining * 3600);
     }
@@ -385,10 +384,10 @@ export function calculatePowerSourceDurations(tableRows, isCurrentGridOnline, cu
  * 
  * @param {number} currentSoc Current state of charge (0-100)
  * @param {number} currentChargePower Watts being delivered to battery (positive)
- * @param {number} totalCapacityWh Total battery capacity in Watt-hours (default 5120 Wh for 51.2V 100Ah)
+ * @param {number} totalCapacityWh Total battery capacity in Watt-hours (default 7680 Wh for 51.2V 150Ah)
  * @returns {number|null} Estimated seconds until full, or null if not charging / full
  */
-export function calculateTimeToFullCharge(currentSoc, currentChargePower, totalCapacityWh = 5120) {
+export function calculateTimeToFullCharge(currentSoc, currentChargePower, totalCapacityWh = 7680) {
   const soc = parseFloat(String(currentSoc).replace('%', '')) || 0;
   const pChg = parseFloat(currentChargePower) || 0;
 
@@ -448,9 +447,9 @@ export function formatDurationHuman(seconds, isEn = false, includeSeconds = true
 /**
  * Calculates dynamic cycle counts and State of Health (SOH) for battery modules.
  *
- * - For the owner's 2× Dyness B4850 pack (when dongle telemetry is active and BMS cycle counter is 0),
- *   partitions cumulative discharge at 257.5 kWh (2026-02-14 15:24 expansion) between B1 (2025-11-16)
- *   and B2 (2026-02-14).
+ * - For the owner's 3× Dyness B4850 pack (when dongle telemetry is active and BMS cycle counter is 0),
+ *   partitions cumulative discharge at 257.5 kWh (2026-02-14 15:24 expansion to 2×) and
+ *   589.2 kWh (2026-11-24 19:42 expansion to 3×) between B1 (2025-11-16), B2 (2026-02-14), and B3 (2026-11-24).
  * - For any other user / cloud-only fallback, computes generic LiFePO4 pack cycles & SOH from
  *   bmsCycleCnt (when reported) or eDisChgAll / nominal pack energy (batCapacity * 48V).
  */
@@ -461,15 +460,16 @@ export function calculateBatteryHealth(latestRow, liveData, status = null) {
   const bmsCycleReported = parseInt(liveData?.bmsCycleCnt ?? latestRow?.bmsCycleCnt, 10) || 0;
   const batParallel = String(liveData?.batParallelNum ?? status?.plant?.inverters?.[0]?.batParallelNum ?? '');
   const batCapacityStr = String(liveData?.batCapacity ?? '');
-  const isOwnerDynessDual =
+  const isOwnerDynessPack =
     liveData?.source === 'dongle' ||
     (!!status?.dongleEnabled &&
       bmsCycleReported === 0 &&
-      batParallel === '2' &&
-      (!batCapacityStr || batCapacityStr === '100'));
+      (batParallel === '2' || batParallel === '3') &&
+      (!batCapacityStr || batCapacityStr === '100' || batCapacityStr === '150'));
 
-  if (isOwnerDynessDual) {
+  if (isOwnerDynessPack) {
     const SOLO_DISCHARGE_KWH = 257.5;
+    const DUAL_DISCHARGE_KWH = 589.2;
     const NOMINAL_MODULE_KWH = 2.4;
     const CALENDAR_AGING_PER_YEAR = 0.3;
 
@@ -479,14 +479,17 @@ export function calculateBatteryHealth(latestRow, liveData, status = null) {
     const totalChgKwh = Number.isFinite(parsedChg) && parsedChg > 0 ? parsedChg : 0;
 
     const soloKwh = Math.min(totalDisChgKwh, SOLO_DISCHARGE_KWH);
-    const parallelKwh = Math.max(0, totalDisChgKwh - SOLO_DISCHARGE_KWH);
+    const dualKwh = Math.max(0, Math.min(totalDisChgKwh, DUAL_DISCHARGE_KWH) - SOLO_DISCHARGE_KWH);
+    const tripleKwh = Math.max(0, totalDisChgKwh - DUAL_DISCHARGE_KWH);
 
-    const bat1Kwh = soloKwh + parallelKwh / 2;
-    const bat2Kwh = parallelKwh / 2;
+    const bat1Kwh = soloKwh + dualKwh / 2 + tripleKwh / 3;
+    const bat2Kwh = dualKwh / 2 + tripleKwh / 3;
+    const bat3Kwh = tripleKwh / 3;
 
     const bat1Cycles = Math.round(bat1Kwh / NOMINAL_MODULE_KWH);
     const bat2Cycles = Math.round(bat2Kwh / NOMINAL_MODULE_KWH);
-    const avgCycles = Math.round((bat1Cycles + bat2Cycles) / 2);
+    const bat3Cycles = Math.round(bat3Kwh / NOMINAL_MODULE_KWH);
+    const avgCycles = Math.round((bat1Cycles + bat2Cycles + bat3Cycles) / 3);
 
     const refTimeStr = liveData?.deviceTime || latestRow?.time;
     const parsedRefMs = refTimeStr ? new Date(String(refTimeStr).replace(/-/g, '/')).getTime() : Date.now();
@@ -495,31 +498,37 @@ export function calculateBatteryHealth(latestRow, liveData, status = null) {
     const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000;
     const b1StartMs = new Date('2025/11/16 00:00:00').getTime();
     const b2StartMs = new Date('2026/02/14 15:24:00').getTime();
+    const b3StartMs = new Date('2026/11/24 19:42:00').getTime();
 
     const b1Years = Math.max(0, (refMs - b1StartMs) / MS_PER_YEAR);
     const b2Years = Math.max(0, (refMs - b2StartMs) / MS_PER_YEAR);
+    const b3Years = Math.max(0, (refMs - b3StartMs) / MS_PER_YEAR);
 
     const bat1SohNum = Math.max(0, Math.min(100, 100 - bat1Cycles * cycleLossPerCycle - b1Years * CALENDAR_AGING_PER_YEAR));
     const bat2SohNum = Math.max(0, Math.min(100, 100 - bat2Cycles * cycleLossPerCycle - b2Years * CALENDAR_AGING_PER_YEAR));
-    const avgSohNum = (bat1SohNum + bat2SohNum) / 2;
+    const bat3SohNum = Math.max(0, Math.min(100, 100 - bat3Cycles * cycleLossPerCycle - b3Years * CALENDAR_AGING_PER_YEAR));
+    const avgSohNum = (bat1SohNum + bat2SohNum + bat3SohNum) / 3;
 
     return {
       isSplitModules: true,
-      model: '2× Dyness B4850',
+      model: '3× Dyness B4850',
       bat1Cycles,
       bat2Cycles,
+      bat3Cycles,
       avgCycles,
       bat1Soh: bat1SohNum.toFixed(1),
       bat2Soh: bat2SohNum.toFixed(1),
+      bat3Soh: bat3SohNum.toFixed(1),
       avgSoh: avgSohNum.toFixed(1),
       bat1Kwh: Number(bat1Kwh.toFixed(1)),
       bat2Kwh: Number(bat2Kwh.toFixed(1)),
+      bat3Kwh: Number(bat3Kwh.toFixed(1)),
       totalDisChgKwh: Number(totalDisChgKwh.toFixed(1)),
       totalChgKwh: Number(totalChgKwh.toFixed(1)),
     };
   }
 
-  const capacityAh = parseFloat(liveData?.batCapacity) || 100;
+  const capacityAh = parseFloat(liveData?.batCapacity) || 150;
   const parallelNum = parseInt(batParallel, 10) || 1;
   const packKwh = (capacityAh * 48) / 1000;
 
@@ -538,12 +547,15 @@ export function calculateBatteryHealth(latestRow, liveData, status = null) {
     model: parallelNum > 1 ? `${parallelNum}× LiFePO4 (${capacityAh}Ah)` : `LiFePO4 (${capacityAh}Ah)`,
     bat1Cycles: avgCycles,
     bat2Cycles: 0,
+    bat3Cycles: 0,
     avgCycles,
     bat1Soh: sohNum.toFixed(1),
     bat2Soh: sohNum.toFixed(1),
+    bat3Soh: sohNum.toFixed(1),
     avgSoh: sohNum.toFixed(1),
     bat1Kwh: Number(totalDisChgKwh.toFixed(1)),
     bat2Kwh: 0,
+    bat3Kwh: 0,
     totalDisChgKwh: Number(totalDisChgKwh.toFixed(1)),
     totalChgKwh: Number(totalChgKwh.toFixed(1)),
   };

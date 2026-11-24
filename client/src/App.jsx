@@ -603,10 +603,15 @@ export default function App() {
     ? (Number(liveData.vBat) / 10).toFixed(1)
     : (latestRow?.vBat ? Number(latestRow.vBat).toFixed(1) : '0.0');
 
+  const batteryCapacityWh = useMemo(() => {
+    const capAh = parseFloat(liveData?.batCapacity);
+    return Number.isFinite(capAh) && capAh > 0 ? capAh * 51.2 : 7680;
+  }, [liveData?.batCapacity]);
+
   // Power source durations (battery vs grid streak, estimated remaining runtime and 24h totals)
   const powerSourceDurations = useMemo(() => {
-    return calculatePowerSourceDurations(tableRows, gridEpsInfo.isGridOnline, soc);
-  }, [tableRows, gridEpsInfo.isGridOnline, soc]);
+    return calculatePowerSourceDurations(tableRows, gridEpsInfo.isGridOnline, soc, batteryCapacityWh);
+  }, [tableRows, gridEpsInfo.isGridOnline, soc, batteryCapacityWh]);
 
   // Single-day detailed power source history (intervals, outage counts, energy per session)
   const singleDayUptime = useMemo(() => {
@@ -616,8 +621,8 @@ export default function App() {
 
   // Estimated time until full charge (based on current charging power and 2-stage BMS curve)
   const timeToFullChargeSec = useMemo(() => {
-    return calculateTimeToFullCharge(soc, battCharge);
-  }, [soc, battCharge]);
+    return calculateTimeToFullCharge(soc, battCharge, batteryCapacityWh);
+  }, [soc, battCharge, batteryCapacityWh]);
 
   // Dynamic battery cycle count and SOH estimation
   const batteryHealth = useMemo(() => {

@@ -12,7 +12,7 @@ import {
   Flame,
   Sun
 } from 'lucide-react';
-import { formatDateHuman } from '../../utils/dateFormat';
+import BatteryModulesPopup from '../BatteryModulesPopup';
 
 /**
  * MobilePowerFlowDiagram
@@ -52,20 +52,10 @@ export default function MobilePowerFlowDiagram({
     model: batteryModel = 'LiFePO4',
     bat1Cycles = 0,
     bat2Cycles = 0,
+    bat3Cycles = 0,
     avgCycles = 0,
-    bat1Soh = '100.0',
-    bat2Soh = '100.0',
     avgSoh = '100.0',
-    bat1Kwh = 0,
-    bat2Kwh = 0,
-    totalDisChgKwh = 0,
   } = batteryHealth || {};
-
-  const b1DateLabel = formatDateHuman('2025-11-16', lang);
-  const b2DateLabel = formatDateHuman('2026-02-14', lang);
-  const batteryTitleTooltip = isSplitModules
-    ? `B1 (${b1DateLabel}): ${bat1Soh}% (${bat1Kwh} ${unitKwh})\nB2 (${b2DateLabel}): ${bat2Soh}% (${bat2Kwh} ${unitKwh})`
-    : `${isEn ? 'Lifetime discharge' : 'Загальний розряд'}: ${totalDisChgKwh} ${unitKwh} (${avgCycles} ${isEn ? 'cycles' : 'циклів'})`;
 
   const isCharging = batteryPower > 0;
   const isDischarging = batteryPower < 0;
@@ -231,10 +221,7 @@ export default function MobilePowerFlowDiagram({
                 )}
               </div>
               <div className="flex flex-col">
-                <span
-                  className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-help"
-                  title={batteryTitleTooltip}
-                >
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                   {isEn ? 'Battery' : 'Акумулятор'}{' '}
                   <span className="font-mono text-[10px] font-semibold text-slate-400">
                     ({batteryModel})
@@ -288,18 +275,15 @@ export default function MobilePowerFlowDiagram({
           </div>
 
           <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-200/40 dark:border-white/[0.04] text-[10px] font-mono text-slate-500 dark:text-slate-400">
-            <span title={isEn ? `Avg: ${avgCycles} cycles` : `Сер.: ${avgCycles} циклів`}>
+            <BatteryModulesPopup batteryHealth={batteryHealth} lang={lang} align="left">
               {isSplitModules ? (
-                <>B1: <strong className="text-slate-700 dark:text-slate-200">{bat1Cycles}</strong> / B2: <strong className="text-slate-700 dark:text-slate-200">{bat2Cycles}</strong> {isEn ? 'cycles' : 'циклів'}</>
+                <>B1: <strong className="text-slate-700 dark:text-slate-200">{bat1Cycles}</strong> / B2: <strong className="text-slate-700 dark:text-slate-200">{bat2Cycles}</strong> / B3: <strong className="text-slate-700 dark:text-slate-200">{bat3Cycles}</strong></>
               ) : (
                 <><strong className="text-slate-700 dark:text-slate-200">{avgCycles}</strong> {isEn ? 'cycles' : 'циклів'}</>
               )}
-            </span>
-            <span title={isSplitModules ? `B1: ${bat1Soh}% • B2: ${bat2Soh}%` : `SOH: ${avgSoh}%`}>
+            </BatteryModulesPopup>
+            <span>
               SOH: <strong className="text-slate-700 dark:text-slate-200">{avgSoh}%</strong>
-              {isSplitModules && (
-                <> <span className="text-[9px] text-slate-400">({bat1Soh}% / {bat2Soh}%)</span></>
-              )}
             </span>
           </div>
         </div>

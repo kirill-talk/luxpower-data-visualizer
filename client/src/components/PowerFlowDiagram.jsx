@@ -12,7 +12,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { translations } from '../utils/i18n';
-import { formatDateHuman } from '../utils/dateFormat';
+import BatteryModulesPopup from './BatteryModulesPopup';
 
 /**
  * PowerFlowDiagram
@@ -57,20 +57,10 @@ export default function PowerFlowDiagram({
     model: batteryModel = 'LiFePO4',
     bat1Cycles = 0,
     bat2Cycles = 0,
+    bat3Cycles = 0,
     avgCycles = 0,
-    bat1Soh = '100.0',
-    bat2Soh = '100.0',
     avgSoh = '100.0',
-    bat1Kwh = 0,
-    bat2Kwh = 0,
-    totalDisChgKwh = 0,
   } = batteryHealth || {};
-
-  const b1DateLabel = formatDateHuman('2025-11-16', lang);
-  const b2DateLabel = formatDateHuman('2026-02-14', lang);
-  const batteryTitleTooltip = isSplitModules
-    ? `B1 (${b1DateLabel}): ${bat1Soh}% (${bat1Kwh} ${unitKwh})\nB2 (${b2DateLabel}): ${bat2Soh}% (${bat2Kwh} ${unitKwh})`
-    : `${isEn ? 'Lifetime discharge' : 'Загальний розряд'}: ${totalDisChgKwh} ${unitKwh} (${avgCycles} ${isEn ? 'cycles' : 'циклів'})`;
 
   const isCharging = batteryPower > 0;
   const isDischarging = batteryPower < 0;
@@ -623,10 +613,7 @@ export default function PowerFlowDiagram({
               </div>
               <div className="flex flex-col flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span
-                    className="block text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 truncate cursor-help"
-                    title={batteryTitleTooltip}
-                  >
+                  <span className="block text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 truncate">
                     {isEn ? 'Battery' : 'Акумулятор'}
                     <span className="hidden sm:inline"> ({batteryModel})</span>
                   </span>
@@ -662,25 +649,15 @@ export default function PowerFlowDiagram({
                     </strong>
                   </span>
                   <span>•</span>
-                  <span
-                    className="whitespace-nowrap cursor-help"
-                    title={isSplitModules
-                      ? (isEn
-                        ? `Avg: ${avgCycles} cycles • B1 (${b1DateLabel}): ${bat1Kwh} kWh (${bat1Cycles} cyc) • B2 (${b2DateLabel}): ${bat2Kwh} kWh (${bat2Cycles} cyc)`
-                        : `Сер.: ${avgCycles} циклів • B1 (${b1DateLabel}): ${bat1Kwh} кВт·год (${bat1Cycles} ц.) • B2 (${b2DateLabel}): ${bat2Kwh} кВт·год (${bat2Cycles} ц.)`)
-                      : `${avgCycles} ${isEn ? 'cycles' : 'циклів'}`}
-                  >
+                  <BatteryModulesPopup batteryHealth={batteryHealth} lang={lang} align="center">
                     {isSplitModules ? (
-                      <>B1: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{bat1Cycles}</strong> / B2: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{bat2Cycles}</strong> {isEn ? 'cycles' : 'циклів'}</>
+                      <>B1: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{bat1Cycles}</strong> / B2: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{bat2Cycles}</strong> / B3: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{bat3Cycles}</strong></>
                     ) : (
                       <><strong className="text-slate-700 dark:text-slate-200 font-semibold">{avgCycles}</strong> {isEn ? 'cycles' : 'циклів'}</>
                     )}
-                  </span>
+                  </BatteryModulesPopup>
                   <span>•</span>
-                  <span
-                    className="whitespace-nowrap cursor-help"
-                    title={isSplitModules ? `B1: ${bat1Soh}% • B2: ${bat2Soh}%` : `SOH: ${avgSoh}%`}
-                  >
+                  <span className="whitespace-nowrap">
                     SOH: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{avgSoh}%</strong>
                   </span>
                 </div>
