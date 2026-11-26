@@ -1,7 +1,7 @@
 import React from 'react';
 import { Home, Battery, BatteryCharging, Zap, Cpu, Flame, Clock } from 'lucide-react';
 import { translations } from '../../utils/i18n';
-import { formatDurationHuman } from '../../utils/energyMath';
+import { formatDurationHuman, calculateUsableSocPercent } from '../../utils/energyMath';
 
 /**
  * MobileKpiGrid
@@ -45,6 +45,7 @@ export default function MobileKpiGrid({
   const isCharging = battCharge > 0;
   const isDischarging = battDischarge > 0;
   const socNum = Math.max(0, Math.min(100, parseFloat(soc) || 0));
+  const usableSocPercent = calculateUsableSocPercent(socNum);
   const remainingBatteryKwh = ((socNum / 100) * (batteryCapacityWh / 1000)).toFixed(2);
   const usableBatteryKwh = ((Math.max(0, socNum - 15) / 100) * (batteryCapacityWh / 1000)).toFixed(2);
   const maxUsableBatteryKwh = ((0.85 * batteryCapacityWh) / 1000).toFixed(2);
@@ -158,10 +159,10 @@ export default function MobileKpiGrid({
               <span
                 className="font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 ml-0.5 cursor-help"
                 title={isEn
-                  ? `State of Charge: ${soc}% (usable above 15% Cut-Off SOC: ${Math.max(0, Math.round(socNum - 15))}%)`
-                  : `Рівень заряду (SOC): ${soc}% (корисно до 15% Cut-Off SOC: ${Math.max(0, Math.round(socNum - 15))}%)`}
+                  ? `Usable State of Charge: ${usableSocPercent}% (0% = 15% Cut-Off SOC, 100% = full) • BMS SOC: ${Math.round(socNum)}%`
+                  : `Корисний заряд: ${usableSocPercent}% (0% = 15% Cut-Off SOC, 100% = повний) • BMS SOC: ${Math.round(socNum)}%`}
               >
-                {soc}%
+                {usableSocPercent}%
               </span>
             </div>
           </div>

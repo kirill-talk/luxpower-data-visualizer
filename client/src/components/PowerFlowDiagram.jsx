@@ -33,6 +33,7 @@ export default function PowerFlowDiagram({
   homeLoad = 0,
   batteryPower = 0, // positive = charging, negative = discharging
   soc = 0,
+  rawSoc,
   inverterLoss = 0,
   gridVoltage = '0.0',
   gridFrequency = '0.0',
@@ -655,9 +656,16 @@ export default function PowerFlowDiagram({
                   </span>
                 </div>
                 <div className="flex items-baseline gap-1.5 sm:gap-2 mt-0.5">
-                  <span className={`font-mono text-lg sm:text-2xl font-extrabold font-tabular ${
-                    isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'
-                  }`}>
+                  <span
+                    className={`font-mono text-lg sm:text-2xl font-extrabold font-tabular cursor-help ${
+                      isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'
+                    }`}
+                    title={rawSoc !== undefined
+                      ? (isEn
+                        ? `Usable State of Charge: ${soc}% (0% = 15% Cut-Off SOC, 100% = full) • BMS SOC: ${Math.round(parseFloat(rawSoc) || 0)}%`
+                        : `Корисний заряд: ${soc}% (0% = 15% Cut-Off SOC, 100% = повний) • BMS SOC: ${Math.round(parseFloat(rawSoc) || 0)}%`)
+                      : undefined}
+                  >
                     {soc}%
                   </span>
                   <span className={`text-[10px] sm:text-xs font-mono font-bold ${isCharging ? 'text-emerald-600 dark:text-emerald-400' : isDischarging ? 'text-rose-500' : 'text-slate-400'}`}>

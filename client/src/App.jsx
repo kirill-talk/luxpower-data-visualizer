@@ -52,6 +52,7 @@ import {
   analyzePowerSourceHistory,
   calculateTimeToFullCharge,
   calculateBatteryHealth,
+  calculateUsableSocPercent,
   formatDurationHuman
 } from './utils/energyMath';
 
@@ -623,6 +624,8 @@ export default function App() {
     return ((0.85 * batteryCapacityWh) / 1000).toFixed(2);
   }, [batteryCapacityWh]);
 
+  const usableSocPercent = useMemo(() => calculateUsableSocPercent(soc), [soc]);
+
   // Power source durations (battery vs grid streak, estimated remaining runtime and 24h totals)
   const powerSourceDurations = useMemo(() => {
     return calculatePowerSourceDurations(tableRows, gridEpsInfo.isGridOnline, soc, batteryCapacityWh);
@@ -1181,10 +1184,10 @@ export default function App() {
                         <span
                           className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 cursor-help"
                           title={lang === 'en'
-                            ? `State of Charge: ${soc}% (usable above 15% Cut-Off SOC: ${Math.max(0, Math.round((parseFloat(soc) || 0) - 15))}%)`
-                            : `Рівень заряду (SOC): ${soc}% (корисно до 15% Cut-Off SOC: ${Math.max(0, Math.round((parseFloat(soc) || 0) - 15))}%)`}
+                            ? `Usable State of Charge: ${usableSocPercent}% (0% = 15% Cut-Off SOC, 100% = full) • BMS SOC: ${Math.round(parseFloat(soc) || 0)}%`
+                            : `Корисний заряд: ${usableSocPercent}% (0% = 15% Cut-Off SOC, 100% = повний) • BMS SOC: ${Math.round(parseFloat(soc) || 0)}%`}
                         >
-                          {soc}%
+                          {usableSocPercent}%
                         </span>
                       </div>
                       {battCharge > 0 && timeToFullChargeSec !== null && (
@@ -1305,7 +1308,8 @@ export default function App() {
                     gridPower={gridImport}
                     homeLoad={homeLoad}
                     batteryPower={battCharge > 0 ? battCharge : (battDischarge > 0 ? -battDischarge : 0)}
-                    soc={soc}
+                    soc={usableSocPercent}
+                    rawSoc={soc}
                     inverterLoss={currentInverterLoss}
                     gridVoltage={gridEpsInfo.voltage}
                     gridFrequency={gridEpsInfo.frequency}
@@ -1329,7 +1333,8 @@ export default function App() {
                     gridPower={gridImport}
                     homeLoad={homeLoad}
                     batteryPower={battCharge > 0 ? battCharge : (battDischarge > 0 ? -battDischarge : 0)}
-                    soc={soc}
+                    soc={usableSocPercent}
+                    rawSoc={soc}
                     inverterLoss={currentInverterLoss}
                     gridVoltage={gridEpsInfo.voltage}
                     gridFrequency={gridEpsInfo.frequency}

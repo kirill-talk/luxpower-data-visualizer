@@ -2,6 +2,19 @@
  * Utility functions for energy calculations, normalization, and interval integrations.
  */
 
+export const BMS_CUTOFF_SOC = 15;
+
+/**
+ * Converts raw BMS State of Charge (0-100%) to user-facing usable percentage (0-100%),
+ * where 0% corresponds to BMS cutoff (15%) and 100% corresponds to full charge (100%).
+ */
+export function calculateUsableSocPercent(rawSoc, cutoffSoc = BMS_CUTOFF_SOC) {
+  const socNum = Math.max(0, Math.min(100, parseFloat(String(rawSoc ?? 0).replace('%', '')) || 0));
+  const usableRange = 100 - cutoffSoc;
+  if (usableRange <= 0) return Math.round(socNum);
+  return Math.max(0, Math.min(100, Math.round(((socNum - cutoffSoc) / usableRange) * 100)));
+}
+
 export function parseInverterPoint(point) {
   if (!point) return null;
 

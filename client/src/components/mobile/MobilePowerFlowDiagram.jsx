@@ -29,6 +29,7 @@ export default function MobilePowerFlowDiagram({
   homeLoad = 0,
   batteryPower = 0,
   soc = '0',
+  rawSoc,
   inverterLoss = 0,
   gridVoltage = '0.0',
   gridFrequency = '0.0',
@@ -247,9 +248,16 @@ export default function MobilePowerFlowDiagram({
 
           <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/50 dark:border-white/[0.05]">
             <div className="flex items-baseline gap-1.5">
-              <span className={`font-mono text-xl font-extrabold ${
-                isCharging ? 'text-emerald-500' : isDischarging ? 'text-rose-500' : 'text-slate-700 dark:text-slate-200'
-              }`}>
+              <span
+                className={`font-mono text-xl font-extrabold cursor-help ${
+                  isCharging ? 'text-emerald-500' : isDischarging ? 'text-rose-500' : 'text-slate-700 dark:text-slate-200'
+                }`}
+                title={rawSoc !== undefined
+                  ? (isEn
+                    ? `Usable State of Charge: ${soc}% (0% = 15% Cut-Off SOC, 100% = full) • BMS SOC: ${Math.round(parseFloat(rawSoc) || 0)}%`
+                    : `Корисний заряд: ${soc}% (0% = 15% Cut-Off SOC, 100% = повний) • BMS SOC: ${Math.round(parseFloat(rawSoc) || 0)}%`)
+                  : undefined}
+              >
                 {soc}%
               </span>
               <span className={`font-mono text-xs font-bold ${
