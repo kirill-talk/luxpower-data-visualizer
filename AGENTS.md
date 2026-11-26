@@ -90,3 +90,16 @@ This document provides essential context, architecture details, and runtime envi
 - **Run Backend Locally**: `npm run dev`
 - **Manage Docker**: `docker compose down && docker compose up -d --build`
 - **View Docker Logs**: `docker compose logs -f app`
+
+---
+
+## 🚀 Mandatory Post-Task Deployment & Sync Rule
+
+After completing **any** code, UI, or configuration changes in this repository (unless the user explicitly asks not to deploy/commit):
+1. **Verify**: Run build/tests (e.g., `./node_modules/.bin/vite build` in `client/`).
+2. **Update Git**: Stage only the relevant modified files, commit with a descriptive conventional commit message, and push to `origin main` (`git push origin main`).
+3. **Rebuild Docker Container**: Recreate and restart the self-hosted container so the live dev server reflects the changes:
+   ```bash
+   docker compose down && docker compose up -d --build
+   ```
+4. **Trigger GitHub Pages**: Pushing to `main` automatically triggers `.github/workflows/deploy.yml` (`Deploy to GitHub Pages`) to rebuild and publish the static SPA to `https://kirill-talk.github.io/luxpower-data-visualizer/`. Verify the push succeeded (and re-trigger `workflow_dispatch` if needed) so the live site is updated.
